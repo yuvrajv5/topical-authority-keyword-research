@@ -1,0 +1,1532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Topical Authority Map: Virtual Receptionist</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-light: #3b82f6;
+            --success: #16a34a;
+            --warning: #ca8a04;
+            --danger: #dc2626;
+            --gray-50: #f9fafb;
+            --gray-100: #f3f4f6;
+            --gray-200: #e5e7eb;
+            --gray-300: #d1d5db;
+            --gray-600: #4b5563;
+            --gray-700: #374151;
+            --gray-800: #1f2937;
+            --gray-900: #111827;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: var(--gray-50);
+            color: var(--gray-800);
+            line-height: 1.6;
+        }
+
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+
+        header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            color: white;
+            padding: 40px 20px;
+            margin-bottom: 30px;
+            border-radius: 12px;
+        }
+
+        header h1 { font-size: 2.5rem; margin-bottom: 10px; }
+        header .meta { opacity: 0.9; font-size: 0.95rem; }
+        header .meta span { margin-right: 20px; }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .stat-card .number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .stat-card .label {
+            color: var(--gray-600);
+            font-size: 0.9rem;
+            margin-top: 5px;
+        }
+
+        .section {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+            overflow: hidden;
+        }
+
+        .section-header {
+            background: var(--gray-100);
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--gray-200);
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .section-header h2 {
+            font-size: 1.25rem;
+            color: var(--gray-800);
+        }
+
+        .section-header .toggle {
+            font-size: 1.5rem;
+            color: var(--gray-600);
+            transition: transform 0.3s;
+        }
+
+        .section-header.collapsed .toggle { transform: rotate(-90deg); }
+
+        .section-content { padding: 24px; }
+        .section-content.hidden { display: none; }
+
+        /* Cluster Visualization */
+        #cluster-graph {
+            width: 100%;
+            height: 600px;
+            border: 1px solid var(--gray-200);
+            border-radius: 8px;
+            background: white;
+        }
+
+        .node { cursor: pointer; }
+        .node circle { stroke: white; stroke-width: 2px; }
+        .node text { font-size: 11px; fill: var(--gray-700); }
+        .link { stroke: var(--gray-300); stroke-opacity: 0.6; }
+
+        .node-pillar circle { fill: var(--primary); }
+        .node-cluster circle { fill: var(--success); }
+        .node-supporting circle { fill: var(--warning); }
+
+        .legend {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+        }
+
+        .legend-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        /* Tables */
+        .table-container {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 800px;
+        }
+
+        th, td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--gray-200);
+        }
+
+        th {
+            background: var(--gray-50);
+            font-weight: 600;
+            color: var(--gray-700);
+            position: sticky;
+            top: 0;
+            cursor: pointer;
+        }
+
+        th:hover { background: var(--gray-100); }
+
+        tr:hover { background: var(--gray-50); }
+
+        .priority-high {
+            background: #dcfce7;
+            color: #166534;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            display: inline-block;
+        }
+
+        .priority-medium {
+            background: #fef9c3;
+            color: #854d0e;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            display: inline-block;
+        }
+
+        .priority-low {
+            background: var(--gray-100);
+            color: var(--gray-600);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            display: inline-block;
+        }
+
+        .intent-info { color: #2563eb; font-weight: 500; }
+        .intent-commercial { color: #7c3aed; font-weight: 500; }
+        .intent-transactional { color: #059669; font-weight: 500; }
+
+        .cluster-tag {
+            background: var(--primary);
+            color: white;
+            padding: 3px 10px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            white-space: nowrap;
+            display: inline-block;
+        }
+
+        .cluster-tag.definition { background: #2563eb; }
+        .cluster-tag.comparison { background: #7c3aed; }
+        .cluster-tag.industry { background: #059669; }
+        .cluster-tag.how-to { background: #d97706; }
+        .cluster-tag.commercial { background: #dc2626; }
+        .cluster-tag.features { background: #0891b2; }
+
+        /* Roadmap */
+        .roadmap-phase {
+            border-left: 4px solid var(--primary);
+            padding-left: 20px;
+            margin-bottom: 30px;
+        }
+
+        .roadmap-phase.phase-2 { border-left-color: var(--success); }
+        .roadmap-phase.phase-3 { border-left-color: var(--warning); }
+
+        .roadmap-phase h3 {
+            color: var(--primary);
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+        }
+
+        .roadmap-phase.phase-2 h3 { color: var(--success); }
+        .roadmap-phase.phase-3 h3 { color: var(--warning); }
+
+        .roadmap-item {
+            background: var(--gray-50);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+
+        .roadmap-item .title { font-weight: 600; margin-bottom: 5px; }
+        .roadmap-item .rationale { color: var(--gray-600); font-size: 0.9rem; }
+        .roadmap-item .links-to { color: var(--primary); font-size: 0.85rem; margin-top: 5px; }
+
+        /* Competitors */
+        .competitor-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+        }
+
+        .competitor-card {
+            border: 1px solid var(--gray-200);
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .competitor-card h4 { color: var(--primary); margin-bottom: 10px; font-size: 1.1rem; }
+        .competitor-card .content-count { color: var(--gray-600); font-size: 0.9rem; margin-bottom: 10px; }
+        .competitor-card .strengths { color: var(--success); margin-bottom: 8px; }
+        .competitor-card .weaknesses { color: var(--danger); }
+        .competitor-card ul { margin-left: 20px; font-size: 0.9rem; }
+
+        /* Search & Filter */
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .search-input {
+            flex: 1;
+            min-width: 200px;
+            padding: 10px 15px;
+            border: 1px solid var(--gray-300);
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+
+        .filter-select {
+            padding: 10px 15px;
+            border: 1px solid var(--gray-300);
+            border-radius: 8px;
+            font-size: 1rem;
+            background: white;
+        }
+
+        /* Content Order */
+        .order-number {
+            background: var(--primary);
+            color: white;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+
+        /* Linking Strategy */
+        .linking-diagram {
+            background: var(--gray-50);
+            padding: 20px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 0.9rem;
+            white-space: pre;
+            overflow-x: auto;
+            margin-bottom: 20px;
+        }
+
+        .linking-rules {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+        }
+
+        .linking-rule {
+            background: var(--gray-50);
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 3px solid var(--primary);
+        }
+
+        .linking-rule strong { color: var(--primary); }
+
+        /* Print Styles */
+        @media print {
+            .section-header .toggle { display: none; }
+            .section-content.hidden { display: block !important; }
+            .controls { display: none; }
+            header { background: var(--primary) !important; -webkit-print-color-adjust: exact; }
+        }
+
+        /* Tooltip */
+        .tooltip {
+            position: absolute;
+            background: var(--gray-800);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            pointer-events: none;
+            z-index: 1000;
+            max-width: 300px;
+        }
+
+        /* Summary */
+        .summary-text {
+            font-size: 1rem;
+            line-height: 1.8;
+        }
+
+        .summary-text p {
+            margin-bottom: 15px;
+        }
+
+        .market-stats {
+            background: var(--gray-50);
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .market-stat {
+            text-align: center;
+        }
+
+        .market-stat .value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .market-stat .label {
+            font-size: 0.85rem;
+            color: var(--gray-600);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Topical Authority Map: Virtual Receptionist</h1>
+            <div class="meta">
+                <span>Generated: December 18, 2025</span>
+                <span>Target Market: USA</span>
+                <span>Total Keywords: 85+</span>
+            </div>
+        </header>
+
+        <!-- Stats Overview -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="number">5</div>
+                <div class="label">Pillar Topics</div>
+            </div>
+            <div class="stat-card">
+                <div class="number">14</div>
+                <div class="label">Cluster Topics</div>
+            </div>
+            <div class="stat-card">
+                <div class="number">18</div>
+                <div class="label">High Priority Keywords</div>
+            </div>
+            <div class="stat-card">
+                <div class="number">8</div>
+                <div class="label">Competitors Analyzed</div>
+            </div>
+        </div>
+
+        <!-- Executive Summary -->
+        <div class="section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h2>Executive Summary</h2>
+                <span class="toggle">&#9660;</span>
+            </div>
+            <div class="section-content">
+                <div class="summary-text">
+                    <p>The <strong>virtual receptionist</strong> market represents a significant content opportunity with strong commercial intent and growing demand. The market spans two main categories: <strong>live human virtual receptionists</strong> (remote workers handling calls) and <strong>AI-powered virtual receptionists</strong> (automated systems using NLP and voice technology).</p>
+
+                    <div class="market-stats">
+                        <div class="market-stat">
+                            <div class="value">$3.85B</div>
+                            <div class="label">Market Size (2024)</div>
+                        </div>
+                        <div class="market-stat">
+                            <div class="value">$9B</div>
+                            <div class="label">Projected (2033)</div>
+                        </div>
+                        <div class="market-stat">
+                            <div class="value">9.8%</div>
+                            <div class="label">CAGR Growth</div>
+                        </div>
+                        <div class="market-stat">
+                            <div class="value">40-60%</div>
+                            <div class="label">Cost Savings vs In-House</div>
+                        </div>
+                    </div>
+
+                    <p>Key content opportunities exist in the <strong>comparison space</strong> (virtual receptionist vs. answering service, vs. in-house receptionist), <strong>industry-specific applications</strong> (law firms, medical/dental, real estate), and the rapidly growing <strong>AI receptionist segment</strong>. Competition is moderate-to-high from established players like Ruby, Smith.ai, and AnswerConnect, but significant gaps exist in educational content, comprehensive guides, and industry-specific comparison content.</p>
+
+                    <p><strong>Recommended Strategy:</strong> Build pillar content around definitional and comparison topics first, then expand into industry verticals and AI-specific content to capture the growing trend toward AI-first solutions.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Interactive Cluster Visualization -->
+        <div class="section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h2>Topic Cluster Visualization</h2>
+                <span class="toggle">&#9660;</span>
+            </div>
+            <div class="section-content">
+                <p style="margin-bottom: 15px; color: var(--gray-600);">
+                    Interactive map showing topic relationships. <strong>Drag nodes</strong> to explore connections.
+                    <strong style="color: var(--primary);">Blue = Pillar (write first)</strong>,
+                    <strong style="color: var(--success);">Green = Cluster (write second)</strong>,
+                    <strong style="color: var(--warning);">Orange = Supporting (write last)</strong>
+                </p>
+                <div id="cluster-graph"></div>
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-dot" style="background: var(--primary);"></div>
+                        <span>Pillar Content (Priority 1 - Write First)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-dot" style="background: var(--success);"></div>
+                        <span>Cluster Content (Priority 2)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-dot" style="background: var(--warning);"></div>
+                        <span>Supporting Content (Priority 3)</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Content Priority Order -->
+        <div class="section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h2>Content Creation Order (What to Write First)</h2>
+                <span class="toggle">&#9660;</span>
+            </div>
+            <div class="section-content">
+                <p style="margin-bottom: 20px; color: var(--gray-600);">Follow this order to build topical authority systematically. Start with pillars to establish your hub pages, then expand with clusters.</p>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Order</th>
+                                <th>Content Topic</th>
+                                <th>Type</th>
+                                <th>Cluster</th>
+                                <th>Priority Score</th>
+                                <th>Why Write This</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><span class="order-number">1</span></td>
+                                <td><strong>What is a Virtual Receptionist? Complete Guide</strong></td>
+                                <td><span class="cluster-tag definition">Pillar</span></td>
+                                <td>Definition</td>
+                                <td><span class="priority-high">9.2</span></td>
+                                <td>Foundation content - establishes topical authority</td>
+                            </tr>
+                            <tr>
+                                <td><span class="order-number">2</span></td>
+                                <td><strong>Best Virtual Receptionist Services 2025</strong></td>
+                                <td><span class="cluster-tag commercial">Pillar</span></td>
+                                <td>Commercial</td>
+                                <td><span class="priority-high">8.8</span></td>
+                                <td>High commercial intent, attracts bottom-funnel traffic</td>
+                            </tr>
+                            <tr>
+                                <td><span class="order-number">3</span></td>
+                                <td><strong>AI Virtual Receptionist: Everything You Need to Know</strong></td>
+                                <td><span class="cluster-tag definition">Pillar</span></td>
+                                <td>AI/Tech</td>
+                                <td><span class="priority-high">8.7</span></td>
+                                <td>Growing trend - captures AI-first searchers</td>
+                            </tr>
+                            <tr>
+                                <td><span class="order-number">4</span></td>
+                                <td><strong>Virtual Receptionist Pricing: Complete Cost Guide</strong></td>
+                                <td><span class="cluster-tag commercial">Pillar</span></td>
+                                <td>Commercial</td>
+                                <td><span class="priority-high">8.5</span></td>
+                                <td>Critical decision-making content</td>
+                            </tr>
+                            <tr>
+                                <td><span class="order-number">5</span></td>
+                                <td><strong>Virtual Receptionist vs Answering Service</strong></td>
+                                <td><span class="cluster-tag comparison">Pillar</span></td>
+                                <td>Comparison</td>
+                                <td><span class="priority-high">8.4</span></td>
+                                <td>High search volume comparison query</td>
+                            </tr>
+                            <tr>
+                                <td><span class="order-number">6</span></td>
+                                <td>Virtual Receptionist for Small Business</td>
+                                <td><span class="cluster-tag industry">Cluster</span></td>
+                                <td>Industry</td>
+                                <td><span class="priority-high">8.3</span></td>
+                                <td>Large target audience segment</td>
+                            </tr>
+                            <tr>
+                                <td><span class="order-number">7</span></td>
+                                <td>Virtual Receptionist for Law Firms</td>
+                                <td><span class="cluster-tag industry">Cluster</span></td>
+                                <td>Industry</td>
+                                <td><span class="priority-high">8.2</span></td>
+                                <td>High-value niche with dedicated providers</td>
+                            </tr>
+                            <tr>
+                                <td><span class="order-number">8</span></td>
+                                <td>How Do Virtual Receptionist Services Work?</td>
+                                <td><span class="cluster-tag how-to">Cluster</span></td>
+                                <td>How-To</td>
+                                <td><span class="priority-high">8.1</span></td>
+                                <td>Informational query with high intent</td>
+                            </tr>
+                            <tr>
+                                <td><span class="order-number">9</span></td>
+                                <td>Virtual Receptionist for Medical & Dental Offices</td>
+                                <td><span class="cluster-tag industry">Cluster</span></td>
+                                <td>Industry</td>
+                                <td><span class="priority-high">8.1</span></td>
+                                <td>HIPAA-compliant niche opportunity</td>
+                            </tr>
+                            <tr>
+                                <td><span class="order-number">10</span></td>
+                                <td>Virtual Receptionist vs In-House Receptionist</td>
+                                <td><span class="cluster-tag comparison">Cluster</span></td>
+                                <td>Comparison</td>
+                                <td><span class="priority-high">8.0</span></td>
+                                <td>Decision-stage content</td>
+                            </tr>
+                            <tr>
+                                <td><span class="order-number">11</span></td>
+                                <td>Dental Virtual Receptionist / AI Receptionist for Dentists</td>
+                                <td><span class="cluster-tag industry">Cluster</span></td>
+                                <td>Industry</td>
+                                <td><span class="priority-high">7.9</span></td>
+                                <td>Low competition niche</td>
+                            </tr>
+                            <tr>
+                                <td><span class="order-number">12</span></td>
+                                <td>Live Virtual Receptionist vs AI Receptionist</td>
+                                <td><span class="cluster-tag comparison">Cluster</span></td>
+                                <td>Comparison</td>
+                                <td><span class="priority-high">7.9</span></td>
+                                <td>Growing comparison query</td>
+                            </tr>
+                            <tr>
+                                <td><span class="order-number">13</span></td>
+                                <td>Virtual Receptionist for Real Estate</td>
+                                <td><span class="cluster-tag industry">Cluster</span></td>
+                                <td>Industry</td>
+                                <td><span class="priority-high">7.9</span></td>
+                                <td>Active industry vertical</td>
+                            </tr>
+                            <tr>
+                                <td><span class="order-number">14</span></td>
+                                <td>24/7 Virtual Receptionist Services</td>
+                                <td><span class="cluster-tag features">Cluster</span></td>
+                                <td>Features</td>
+                                <td><span class="priority-high">7.8</span></td>
+                                <td>Key feature differentiator</td>
+                            </tr>
+                            <tr>
+                                <td><span class="order-number">15</span></td>
+                                <td>Virtual Receptionist Benefits</td>
+                                <td><span class="cluster-tag how-to">Cluster</span></td>
+                                <td>How-To</td>
+                                <td><span class="priority-high">7.8</span></td>
+                                <td>Awareness stage content</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Keyword Database -->
+        <div class="section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h2>Complete Keyword Database</h2>
+                <span class="toggle">&#9660;</span>
+            </div>
+            <div class="section-content">
+                <div class="controls">
+                    <input type="text" class="search-input" id="keyword-search" placeholder="Search keywords..." onkeyup="filterTable()">
+                    <select class="filter-select" id="intent-filter" onchange="filterTable()">
+                        <option value="">All Intents</option>
+                        <option value="Informational">Informational</option>
+                        <option value="Commercial">Commercial</option>
+                        <option value="Transactional">Transactional</option>
+                    </select>
+                    <select class="filter-select" id="priority-filter" onchange="filterTable()">
+                        <option value="">All Priorities</option>
+                        <option value="high">High (7+)</option>
+                        <option value="medium">Medium (4-6)</option>
+                        <option value="low">Low (&lt;4)</option>
+                    </select>
+                    <select class="filter-select" id="cluster-filter" onchange="filterTable()">
+                        <option value="">All Clusters</option>
+                        <option value="Definition">Definition</option>
+                        <option value="Commercial">Commercial</option>
+                        <option value="Comparison">Comparison</option>
+                        <option value="Industry">Industry</option>
+                        <option value="How-To">How-To</option>
+                        <option value="Features">Features</option>
+                        <option value="AI/Tech">AI/Tech</option>
+                    </select>
+                </div>
+                <div class="table-container">
+                    <table id="keyword-table">
+                        <thead>
+                            <tr>
+                                <th onclick="sortTable(0)">Keyword</th>
+                                <th onclick="sortTable(1)">Cluster</th>
+                                <th onclick="sortTable(2)">Intent</th>
+                                <th onclick="sortTable(3)">Competition</th>
+                                <th onclick="sortTable(4)">Priority</th>
+                                <th onclick="sortTable(5)">Suggested Content</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr data-priority="8.8">
+                                <td>what is a virtual receptionist</td>
+                                <td>Definition</td>
+                                <td><span class="intent-info">Informational</span></td>
+                                <td>Medium</td>
+                                <td><span class="priority-high">8.8</span></td>
+                                <td>Pillar: Complete Guide</td>
+                            </tr>
+                            <tr data-priority="8.7">
+                                <td>AI virtual receptionist</td>
+                                <td>AI/Tech</td>
+                                <td><span class="intent-commercial">Commercial</span></td>
+                                <td>Medium</td>
+                                <td><span class="priority-high">8.7</span></td>
+                                <td>Pillar: AI Guide</td>
+                            </tr>
+                            <tr data-priority="8.6">
+                                <td>best virtual receptionist services</td>
+                                <td>Commercial</td>
+                                <td><span class="intent-commercial">Commercial</span></td>
+                                <td>High</td>
+                                <td><span class="priority-high">8.6</span></td>
+                                <td>Pillar: Service Reviews</td>
+                            </tr>
+                            <tr data-priority="8.5">
+                                <td>virtual receptionist</td>
+                                <td>Definition</td>
+                                <td><span class="intent-commercial">Commercial</span></td>
+                                <td>High</td>
+                                <td><span class="priority-high">8.5</span></td>
+                                <td>Pillar: Complete Guide</td>
+                            </tr>
+                            <tr data-priority="8.4">
+                                <td>virtual receptionist pricing</td>
+                                <td>Commercial</td>
+                                <td><span class="intent-commercial">Commercial</span></td>
+                                <td>Medium</td>
+                                <td><span class="priority-high">8.4</span></td>
+                                <td>Pillar: Pricing Guide</td>
+                            </tr>
+                            <tr data-priority="8.3">
+                                <td>virtual receptionist cost</td>
+                                <td>Commercial</td>
+                                <td><span class="intent-commercial">Commercial</span></td>
+                                <td>Medium</td>
+                                <td><span class="priority-high">8.3</span></td>
+                                <td>Pillar: Pricing Guide</td>
+                            </tr>
+                            <tr data-priority="8.2">
+                                <td>virtual receptionist for small business</td>
+                                <td>Industry</td>
+                                <td><span class="intent-commercial">Commercial</span></td>
+                                <td>Medium</td>
+                                <td><span class="priority-high">8.2</span></td>
+                                <td>Cluster: Small Business Guide</td>
+                            </tr>
+                            <tr data-priority="8.1">
+                                <td>virtual receptionist vs answering service</td>
+                                <td>Comparison</td>
+                                <td><span class="intent-commercial">Commercial</span></td>
+                                <td>Medium</td>
+                                <td><span class="priority-high">8.1</span></td>
+                                <td>Pillar: Comparison</td>
+                            </tr>
+                            <tr data-priority="8.1">
+                                <td>how do virtual receptionist services work</td>
+                                <td>How-To</td>
+                                <td><span class="intent-info">Informational</span></td>
+                                <td>Low</td>
+                                <td><span class="priority-high">8.1</span></td>
+                                <td>Cluster: How It Works</td>
+                            </tr>
+                            <tr data-priority="8.0">
+                                <td>virtual receptionist for law firms</td>
+                                <td>Industry</td>
+                                <td><span class="intent-commercial">Commercial</span></td>
+                                <td>Medium</td>
+                                <td><span class="priority-high">8.0</span></td>
+                                <td>Cluster: Legal Industry</td>
+                            </tr>
+                            <tr data-priority="8.0">
+                                <td>virtual receptionist vs in-house receptionist</td>
+                                <td>Comparison</td>
+                                <td><span class="intent-commercial">Commercial</span></td>
+                                <td>Low</td>
+                                <td><span class="priority-high">8.0</span></td>
+                                <td>Cluster: Comparison</td>
+                            </tr>
+                            <tr data-priority="7.9">
+                                <td>legal answering service</td>
+                                <td>Industry</td>
+                                <td><span class="intent-commercial">Commercial</span></td>
+                                <td>Medium</td>
+                                <td><span class="priority-high">7.9</span></td>
+                                <td>Cluster: Legal Industry</td>
+                            </tr>
+                            <tr data-priority="7.9">
+                                <td>dental virtual receptionist</td>
+                                <td>Industry</td>
+                                <td><span class="intent-commercial">Commercial</span></td>
+                                <td>Low</td>
+                                <td><span class="priority-high">7.9</span></td>
+                                <td>Cluster: Healthcare</td>
+                            </tr>
+                            <tr data-priority="7.9">
+                                <td>live virtual receptionist vs AI</td>
+                                <td>Comparison</td>
+                                <td><span class="intent-commercial">Commercial</span></td>
+                                <td>Low</td>
+                                <td><span class="priority-high">7.9</span></td>
+                                <td>Cluster: AI Comparison</td>
+                            </tr>
+                            <tr data-priority="7.9">
+                                <td>virtual receptionist for real estate</td>
+                                <td>Industry</td>
+                                <td><span class="intent-commercial">Commercial</span></td>
+                                <td>Low</td>
+                                <td><span class="priority-high">7.9</span></td>
+                                <td>Cluster: Real Estate</td>
+                            </tr>
+                            <tr data-priority="7.8">
+                                <td>virtual receptionist for medical offices</td>
+                                <td>Industry</td>
+                                <td><span class="intent-commercial">Commercial</span></td>
+                                <td>Medium</td>
+                                <td><span class="priority-high">7.8</span></td>
+                                <td>Cluster: Healthcare</td>
+                            </tr>
+                            <tr data-priority="7.8">
+                                <td>24/7 virtual receptionist</td>
+                                <td>Features</td>
+                                <td><span class="intent-commercial">Commercial</span></td>
+                                <td>Medium</td>
+                                <td><span class="priority-high">7.8</span></td>
+                                <td>Cluster: Features</td>
+                            </tr>
+                            <tr data-priority="7.8">
+                                <td>virtual receptionist benefits</td>
+                                <td>How-To</td>
+                                <td><span class="intent-info">Informational</span></td>
+                                <td>Low</td>
+                                <td><span class="priority-high">7.8</span></td>
+                                <td>Cluster: Benefits</td>
+                            </tr>
+                            <tr data-priority="7.7">
+                                <td>how to hire virtual receptionist</td>
+                                <td>How-To</td>
+                                <td><span class="intent-info">Informational</span></td>
+                                <td>Low</td>
+                                <td><span class="priority-high">7.7</span></td>
+                                <td>Cluster: Hiring Guide</td>
+                            </tr>
+                            <tr data-priority="7.6">
+                                <td>virtual receptionist software</td>
+                                <td>AI/Tech</td>
+                                <td><span class="intent-commercial">Commercial</span></td>
+                                <td>Medium</td>
+                                <td><span class="priority-high">7.6</span></td>
+                                <td>Cluster: Software Guide</td>
+                            </tr>
+                            <tr data-priority="7.4">
+                                <td>live virtual receptionist</td>
+                                <td>Features</td>
+                                <td><span class="intent-commercial">Commercial</span></td>
+                                <td>Medium</td>
+                                <td><span class="priority-high">7.4</span></td>
+                                <td>Cluster: Service Type</td>
+                            </tr>
+                            <tr data-priority="7.3">
+                                <td>virtual receptionist trends 2025</td>
+                                <td>AI/Tech</td>
+                                <td><span class="intent-info">Informational</span></td>
+                                <td>Low</td>
+                                <td><span class="priority-high">7.3</span></td>
+                                <td>Cluster: Trends</td>
+                            </tr>
+                            <tr data-priority="7.2">
+                                <td>what does a virtual receptionist do</td>
+                                <td>Definition</td>
+                                <td><span class="intent-info">Informational</span></td>
+                                <td>Low</td>
+                                <td><span class="priority-high">7.2</span></td>
+                                <td>Pillar section</td>
+                            </tr>
+                            <tr data-priority="7.0">
+                                <td>virtual receptionist best practices</td>
+                                <td>How-To</td>
+                                <td><span class="intent-info">Informational</span></td>
+                                <td>Low</td>
+                                <td><span class="priority-high">7.0</span></td>
+                                <td>Cluster: Best Practices</td>
+                            </tr>
+                            <tr data-priority="7.0">
+                                <td>best AI receptionist for dentists</td>
+                                <td>Industry</td>
+                                <td><span class="intent-commercial">Commercial</span></td>
+                                <td>Low</td>
+                                <td><span class="priority-high">7.0</span></td>
+                                <td>Cluster: Dental AI</td>
+                            </tr>
+                            <tr data-priority="6.9">
+                                <td>how much does a virtual receptionist cost per month</td>
+                                <td>Commercial</td>
+                                <td><span class="intent-commercial">Commercial</span></td>
+                                <td>Low</td>
+                                <td><span class="priority-medium">6.9</span></td>
+                                <td>Pillar: Pricing section</td>
+                            </tr>
+                            <tr data-priority="6.8">
+                                <td>virtual receptionist software tools</td>
+                                <td>AI/Tech</td>
+                                <td><span class="intent-commercial">Commercial</span></td>
+                                <td>Medium</td>
+                                <td><span class="priority-medium">6.8</span></td>
+                                <td>Tools roundup</td>
+                            </tr>
+                            <tr data-priority="6.8">
+                                <td>is a virtual receptionist worth it</td>
+                                <td>How-To</td>
+                                <td><span class="intent-commercial">Commercial</span></td>
+                                <td>Low</td>
+                                <td><span class="priority-medium">6.8</span></td>
+                                <td>Benefits/ROI article</td>
+                            </tr>
+                            <tr data-priority="6.8">
+                                <td>Ruby receptionist alternatives</td>
+                                <td>Comparison</td>
+                                <td><span class="intent-commercial">Commercial</span></td>
+                                <td>Medium</td>
+                                <td><span class="priority-medium">6.8</span></td>
+                                <td>Competitor comparison</td>
+                            </tr>
+                            <tr data-priority="6.7">
+                                <td>after hours answering service</td>
+                                <td>Features</td>
+                                <td><span class="intent-commercial">Commercial</span></td>
+                                <td>Medium</td>
+                                <td><span class="priority-medium">6.7</span></td>
+                                <td>24/7 services cluster</td>
+                            </tr>
+                            <tr data-priority="6.5">
+                                <td>remote receptionist</td>
+                                <td>Definition</td>
+                                <td><span class="intent-info">Informational</span></td>
+                                <td>Low</td>
+                                <td><span class="priority-medium">6.5</span></td>
+                                <td>Include in pillar</td>
+                            </tr>
+                            <tr data-priority="6.5">
+                                <td>HIPAA compliant virtual receptionist</td>
+                                <td>Features</td>
+                                <td><span class="intent-commercial">Commercial</span></td>
+                                <td>Low</td>
+                                <td><span class="priority-medium">6.5</span></td>
+                                <td>Healthcare cluster</td>
+                            </tr>
+                            <tr data-priority="6.5">
+                                <td>Smith.ai vs Ruby</td>
+                                <td>Comparison</td>
+                                <td><span class="intent-commercial">Commercial</span></td>
+                                <td>Low</td>
+                                <td><span class="priority-medium">6.5</span></td>
+                                <td>Head-to-head comparison</td>
+                            </tr>
+                            <tr data-priority="6.4">
+                                <td>virtual front desk</td>
+                                <td>Definition</td>
+                                <td><span class="intent-commercial">Commercial</span></td>
+                                <td>Medium</td>
+                                <td><span class="priority-medium">6.4</span></td>
+                                <td>Software guide</td>
+                            </tr>
+                            <tr data-priority="6.4">
+                                <td>virtual receptionist vs virtual assistant</td>
+                                <td>Comparison</td>
+                                <td><span class="intent-commercial">Commercial</span></td>
+                                <td>Low</td>
+                                <td><span class="priority-medium">6.4</span></td>
+                                <td>Comparison article</td>
+                            </tr>
+                            <tr data-priority="6.3">
+                                <td>virtual receptionist for contractors</td>
+                                <td>Industry</td>
+                                <td><span class="intent-commercial">Commercial</span></td>
+                                <td>Low</td>
+                                <td><span class="priority-medium">6.3</span></td>
+                                <td>Industry guide</td>
+                            </tr>
+                            <tr data-priority="6.2">
+                                <td>phone answering service</td>
+                                <td>Definition</td>
+                                <td><span class="intent-commercial">Commercial</span></td>
+                                <td>High</td>
+                                <td><span class="priority-medium">6.2</span></td>
+                                <td>Related topic</td>
+                            </tr>
+                            <tr data-priority="6.1">
+                                <td>bilingual virtual receptionist</td>
+                                <td>Features</td>
+                                <td><span class="intent-commercial">Commercial</span></td>
+                                <td>Low</td>
+                                <td><span class="priority-medium">6.1</span></td>
+                                <td>Feature article</td>
+                            </tr>
+                            <tr data-priority="6.0">
+                                <td>answering service vs call center</td>
+                                <td>Comparison</td>
+                                <td><span class="intent-commercial">Commercial</span></td>
+                                <td>Medium</td>
+                                <td><span class="priority-medium">6.0</span></td>
+                                <td>Extended comparison</td>
+                            </tr>
+                            <tr data-priority="5.8">
+                                <td>virtual receptionist jobs</td>
+                                <td>Definition</td>
+                                <td><span class="intent-info">Informational</span></td>
+                                <td>Medium</td>
+                                <td><span class="priority-medium">5.8</span></td>
+                                <td>Career guide (low priority)</td>
+                            </tr>
+                            <tr data-priority="5.5">
+                                <td>virtual receptionist tips</td>
+                                <td>How-To</td>
+                                <td><span class="intent-info">Informational</span></td>
+                                <td>Low</td>
+                                <td><span class="priority-medium">5.5</span></td>
+                                <td>Best practices</td>
+                            </tr>
+                            <tr data-priority="5.5">
+                                <td>how to start a virtual receptionist business</td>
+                                <td>How-To</td>
+                                <td><span class="intent-info">Informational</span></td>
+                                <td>Low</td>
+                                <td><span class="priority-medium">5.5</span></td>
+                                <td>Entrepreneur guide</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Competitive Landscape -->
+        <div class="section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h2>Competitive Landscape</h2>
+                <span class="toggle">&#9660;</span>
+            </div>
+            <div class="section-content">
+                <div class="competitor-grid">
+                    <div class="competitor-card">
+                        <h4>ruby.com</h4>
+                        <div class="content-count">50+ content pieces | Market Leader</div>
+                        <div class="strengths">
+                            <strong>Strengths:</strong>
+                            <ul>
+                                <li>20+ years experience, strong brand</li>
+                                <li>Comprehensive guides and resources</li>
+                                <li>High domain authority</li>
+                            </ul>
+                        </div>
+                        <div class="weaknesses">
+                            <strong>Weaknesses:</strong>
+                            <ul>
+                                <li>Commercial focus, less educational</li>
+                                <li>Limited AI-specific content</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="competitor-card">
+                        <h4>smith.ai</h4>
+                        <div class="content-count">40+ content pieces | AI + Human Hybrid</div>
+                        <div class="strengths">
+                            <strong>Strengths:</strong>
+                            <ul>
+                                <li>AI + human hybrid approach</li>
+                                <li>Strong blog content</li>
+                                <li>Pricing transparency</li>
+                            </ul>
+                        </div>
+                        <div class="weaknesses">
+                            <strong>Weaknesses:</strong>
+                            <ul>
+                                <li>Newer brand, less market presence</li>
+                                <li>Less comprehensive guides</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="competitor-card">
+                        <h4>nextiva.com</h4>
+                        <div class="content-count">30+ content pieces | VoIP Focus</div>
+                        <div class="strengths">
+                            <strong>Strengths:</strong>
+                            <ul>
+                                <li>Strong SEO and domain authority</li>
+                                <li>Comprehensive technical guides</li>
+                                <li>Trusted enterprise brand</li>
+                            </ul>
+                        </div>
+                        <div class="weaknesses">
+                            <strong>Weaknesses:</strong>
+                            <ul>
+                                <li>VR is secondary to VoIP focus</li>
+                                <li>Less specialized content</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="competitor-card">
+                        <h4>nexa.com</h4>
+                        <div class="content-count">35+ content pieces | 24/7 Focus</div>
+                        <div class="strengths">
+                            <strong>Strengths:</strong>
+                            <ul>
+                                <li>Industry-specific pages</li>
+                                <li>Strong 24/7 positioning</li>
+                                <li>Good reviews content</li>
+                            </ul>
+                        </div>
+                        <div class="weaknesses">
+                            <strong>Weaknesses:</strong>
+                            <ul>
+                                <li>Less comprehensive guides</li>
+                                <li>Limited AI content</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="competitor-card">
+                        <h4>myaifrontdesk.com</h4>
+                        <div class="content-count">20+ content pieces | AI-First</div>
+                        <div class="strengths">
+                            <strong>Strengths:</strong>
+                            <ul>
+                                <li>AI-first positioning</li>
+                                <li>Good pricing content</li>
+                                <li>Modern approach</li>
+                            </ul>
+                        </div>
+                        <div class="weaknesses">
+                            <strong>Weaknesses:</strong>
+                            <ul>
+                                <li>New player, limited authority</li>
+                                <li>Narrow focus</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="competitor-card">
+                        <h4>mapcommunications.com</h4>
+                        <div class="content-count">25+ content pieces | Educational</div>
+                        <div class="strengths">
+                            <strong>Strengths:</strong>
+                            <ul>
+                                <li>Good educational blog</li>
+                                <li>Strong local SEO</li>
+                                <li>Established presence</li>
+                            </ul>
+                        </div>
+                        <div class="weaknesses">
+                            <strong>Weaknesses:</strong>
+                            <ul>
+                                <li>Dated design</li>
+                                <li>Limited AI content</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <h3 style="margin-top: 30px; margin-bottom: 15px;">Content Gap Opportunities</h3>
+                <div class="linking-rules">
+                    <div class="linking-rule">
+                        <strong>Comprehensive Comparison Hub</strong><br>
+                        No single authoritative source comparing ALL virtual receptionist types (live vs. AI vs. hybrid vs. auto-attendant)
+                    </div>
+                    <div class="linking-rule">
+                        <strong>Industry Deep Dives</strong><br>
+                        Most competitors have shallow industry pages. Opportunity for in-depth guides (e.g., "Complete Guide to VR for Personal Injury Law Firms")
+                    </div>
+                    <div class="linking-rule">
+                        <strong>AI Receptionist Education</strong><br>
+                        Rapidly growing segment with limited educational content. Most content is vendor-produced.
+                    </div>
+                    <div class="linking-rule">
+                        <strong>ROI Calculators & Tools</strong><br>
+                        Interactive content showing cost savings vs. in-house staff - major gap in the market
+                    </div>
+                    <div class="linking-rule">
+                        <strong>Case Studies & Statistics</strong><br>
+                        Limited data-driven content with real metrics and success stories
+                    </div>
+                    <div class="linking-rule">
+                        <strong>Small Business Focus</strong><br>
+                        Most content targets mid-market; opportunity for solopreneur/micro-business content
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Content Roadmap -->
+        <div class="section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h2>Recommended Content Roadmap</h2>
+                <span class="toggle">&#9660;</span>
+            </div>
+            <div class="section-content">
+                <div class="roadmap-phase">
+                    <h3>Phase 1: Foundation (Pillar Content) - Start Here</h3>
+                    <div class="roadmap-item">
+                        <div class="title">1. "What is a Virtual Receptionist? The Complete Guide [2025]"</div>
+                        <div class="rationale">Highest search intent, establishes topical authority. Target: 3,000-4,000 words. Include definition, types, how it works, benefits, costs overview.</div>
+                    </div>
+                    <div class="roadmap-item">
+                        <div class="title">2. "Best Virtual Receptionist Services [2025]: Expert Reviewed"</div>
+                        <div class="rationale">High commercial intent, attracts bottom-of-funnel traffic. Target: 4,000-5,000 words. Include top 10-15 providers, pricing, features, pros/cons.</div>
+                    </div>
+                    <div class="roadmap-item">
+                        <div class="title">3. "Virtual Receptionist Pricing: How Much Does It Really Cost?"</div>
+                        <div class="rationale">Critical decision-making content. Target: 2,500-3,500 words. Include pricing models, hidden costs, cost comparison vs. in-house.</div>
+                    </div>
+                </div>
+
+                <div class="roadmap-phase phase-2">
+                    <h3>Phase 2: Cluster Building</h3>
+                    <div class="roadmap-item">
+                        <div class="title">4. "Virtual Receptionist vs Answering Service: What's the Difference?"</div>
+                        <div class="links-to">Links to: Pillar #1, Pillar #2</div>
+                    </div>
+                    <div class="roadmap-item">
+                        <div class="title">5. "Virtual Receptionist for Law Firms: Complete Guide"</div>
+                        <div class="links-to">Links to: Pillar #1, Pillar #2</div>
+                    </div>
+                    <div class="roadmap-item">
+                        <div class="title">6. "AI Virtual Receptionist: The Future of Business Communication"</div>
+                        <div class="links-to">Links to: Pillar #1, Pricing Guide</div>
+                    </div>
+                    <div class="roadmap-item">
+                        <div class="title">7. "Virtual Receptionist vs In-House Receptionist: Cost & Feature Comparison"</div>
+                        <div class="links-to">Links to: Pricing Guide, Pillar #1</div>
+                    </div>
+                    <div class="roadmap-item">
+                        <div class="title">8. "24/7 Virtual Receptionist Services: Never Miss Another Call"</div>
+                        <div class="links-to">Links to: Best Services, Pillar #1</div>
+                    </div>
+                    <div class="roadmap-item">
+                        <div class="title">9. "Virtual Receptionist for Medical & Dental Practices"</div>
+                        <div class="links-to">Links to: Pillar #1, Pillar #2, HIPAA content</div>
+                    </div>
+                </div>
+
+                <div class="roadmap-phase phase-3">
+                    <h3>Phase 3: Long-tail Expansion</h3>
+                    <div class="roadmap-item">
+                        <div class="title">10. "How to Hire a Virtual Receptionist: Step-by-Step Guide"</div>
+                    </div>
+                    <div class="roadmap-item">
+                        <div class="title">11. "Virtual Receptionist for Real Estate Agents & Brokers"</div>
+                    </div>
+                    <div class="roadmap-item">
+                        <div class="title">12. "Ruby vs Smith.ai: Which Virtual Receptionist is Right for You?"</div>
+                    </div>
+                    <div class="roadmap-item">
+                        <div class="title">13. "Virtual Receptionist Best Practices: Maximize Your Investment"</div>
+                    </div>
+                    <div class="roadmap-item">
+                        <div class="title">14. "Common Virtual Receptionist Mistakes (And How to Avoid Them)"</div>
+                    </div>
+                    <div class="roadmap-item">
+                        <div class="title">15. "HIPAA-Compliant Virtual Receptionist Services for Healthcare"</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Internal Linking Strategy -->
+        <div class="section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h2>Internal Linking Strategy</h2>
+                <span class="toggle">&#9660;</span>
+            </div>
+            <div class="section-content">
+                <h3 style="margin-bottom: 15px;">Hub-and-Spoke Model</h3>
+                <div class="linking-diagram">
+                         [Pillar: What is a VR?]
+                              /    |    \
+                             /     |     \
+          [How to Hire] [Benefits] [Best Practices]
+                   \           |           /
+                    \          |          /
+                     [Pillar: Best Services]
+                          /    |    \
+                         /     |     \
+             [Law Firms] [Medical] [Real Estate]
+                         \     |     /
+                          \    |    /
+                     [Pillar: Pricing Guide]
+                             |
+                   [Cost Comparison Articles]
+                </div>
+
+                <h3 style="margin-top: 30px; margin-bottom: 15px;">Linking Rules</h3>
+                <div class="linking-rules">
+                    <div class="linking-rule">
+                        <strong>Rule 1: Cluster to Pillar</strong><br>
+                        Every cluster page links back to its parent pillar with contextual anchor text
+                    </div>
+                    <div class="linking-rule">
+                        <strong>Rule 2: Pillar Cross-Links</strong><br>
+                        Pillar pages link to each other via contextual mentions (e.g., pricing mentions in guide)
+                    </div>
+                    <div class="linking-rule">
+                        <strong>Rule 3: Industry Cross-Links</strong><br>
+                        Industry pages cross-link (e.g., "See also: Virtual Receptionist for Law Firms")
+                    </div>
+                    <div class="linking-rule">
+                        <strong>Rule 4: Comparison Links</strong><br>
+                        Comparison pages link to both compared topics and the main pillar
+                    </div>
+                    <div class="linking-rule">
+                        <strong>Rule 5: Commercial CTA</strong><br>
+                        All pages include CTA linking to commercial "Best Services" pillar
+                    </div>
+                    <div class="linking-rule">
+                        <strong>Rule 6: Anchor Text Variety</strong><br>
+                        Use varied anchors: "virtual receptionist", "what is a virtual receptionist", "learn more"
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Toggle sections
+        function toggleSection(header) {
+            header.classList.toggle('collapsed');
+            const content = header.nextElementSibling;
+            content.classList.toggle('hidden');
+        }
+
+        // Filter keyword table
+        function filterTable() {
+            const search = document.getElementById('keyword-search').value.toLowerCase();
+            const intent = document.getElementById('intent-filter').value;
+            const priority = document.getElementById('priority-filter').value;
+            const cluster = document.getElementById('cluster-filter').value;
+
+            const rows = document.querySelectorAll('#keyword-table tbody tr');
+
+            rows.forEach(row => {
+                const keyword = row.cells[0].textContent.toLowerCase();
+                const rowIntent = row.cells[2].textContent.trim();
+                const rowPriority = parseFloat(row.dataset.priority);
+                const rowCluster = row.cells[1].textContent;
+
+                let show = true;
+
+                if (search && !keyword.includes(search)) show = false;
+                if (intent && !rowIntent.includes(intent)) show = false;
+                if (cluster && rowCluster !== cluster) show = false;
+                if (priority === 'high' && rowPriority < 7) show = false;
+                if (priority === 'medium' && (rowPriority < 4 || rowPriority >= 7)) show = false;
+                if (priority === 'low' && rowPriority >= 4) show = false;
+
+                row.style.display = show ? '' : 'none';
+            });
+        }
+
+        // Sort table
+        function sortTable(n) {
+            const table = document.getElementById('keyword-table');
+            let switching = true;
+            let dir = 'asc';
+            let switchcount = 0;
+
+            while (switching) {
+                switching = false;
+                const rows = table.rows;
+
+                for (let i = 1; i < rows.length - 1; i++) {
+                    let shouldSwitch = false;
+                    const x = rows[i].getElementsByTagName('td')[n];
+                    const y = rows[i + 1].getElementsByTagName('td')[n];
+
+                    let xVal = x.textContent.toLowerCase();
+                    let yVal = y.textContent.toLowerCase();
+
+                    // Check if numeric (for priority column)
+                    if (n === 4) {
+                        xVal = parseFloat(rows[i].dataset.priority);
+                        yVal = parseFloat(rows[i + 1].dataset.priority);
+                    }
+
+                    if (dir === 'asc') {
+                        if (xVal > yVal) { shouldSwitch = true; break; }
+                    } else if (dir === 'desc') {
+                        if (xVal < yVal) { shouldSwitch = true; break; }
+                    }
+                }
+
+                if (shouldSwitch) {
+                    rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
+                    switching = true;
+                    switchcount++;
+                } else {
+                    if (switchcount === 0 && dir === 'asc') {
+                        dir = 'desc';
+                        switching = true;
+                    }
+                }
+            }
+        }
+
+        // D3.js Force-Directed Graph
+        const graphData = {
+            "nodes": [
+                {"id": "pillar-1", "name": "What is a Virtual Receptionist?", "type": "pillar", "priority": 9.2},
+                {"id": "pillar-2", "name": "Best Virtual Receptionist Services", "type": "pillar", "priority": 8.8},
+                {"id": "pillar-3", "name": "AI Virtual Receptionist", "type": "pillar", "priority": 8.7},
+                {"id": "pillar-4", "name": "Virtual Receptionist Pricing", "type": "pillar", "priority": 8.5},
+                {"id": "pillar-5", "name": "VR vs Answering Service", "type": "pillar", "priority": 8.4},
+                {"id": "cluster-1", "name": "VR for Small Business", "type": "cluster", "priority": 8.3},
+                {"id": "cluster-2", "name": "VR for Law Firms", "type": "cluster", "priority": 8.2},
+                {"id": "cluster-3", "name": "How VR Services Work", "type": "cluster", "priority": 8.1},
+                {"id": "cluster-4", "name": "VR for Medical/Dental", "type": "cluster", "priority": 8.1},
+                {"id": "cluster-5", "name": "VR vs In-House", "type": "cluster", "priority": 8.0},
+                {"id": "cluster-6", "name": "Live vs AI Receptionist", "type": "cluster", "priority": 7.9},
+                {"id": "cluster-7", "name": "VR for Real Estate", "type": "cluster", "priority": 7.9},
+                {"id": "cluster-8", "name": "24/7 VR Services", "type": "cluster", "priority": 7.8},
+                {"id": "cluster-9", "name": "VR Benefits", "type": "cluster", "priority": 7.8},
+                {"id": "cluster-10", "name": "How to Hire VR", "type": "cluster", "priority": 7.7},
+                {"id": "support-1", "name": "VR Best Practices", "type": "supporting", "priority": 7.0},
+                {"id": "support-2", "name": "VR Mistakes to Avoid", "type": "supporting", "priority": 6.5},
+                {"id": "support-3", "name": "Ruby vs Smith.ai", "type": "supporting", "priority": 6.5},
+                {"id": "support-4", "name": "HIPAA Compliant VR", "type": "supporting", "priority": 6.5},
+                {"id": "support-5", "name": "Bilingual VR", "type": "supporting", "priority": 6.1},
+                {"id": "support-6", "name": "VR Trends 2025", "type": "supporting", "priority": 7.3}
+            ],
+            "links": [
+                {"source": "pillar-1", "target": "cluster-3", "value": 2},
+                {"source": "pillar-1", "target": "cluster-9", "value": 2},
+                {"source": "pillar-1", "target": "cluster-10", "value": 2},
+                {"source": "pillar-1", "target": "support-1", "value": 1},
+                {"source": "pillar-2", "target": "cluster-1", "value": 2},
+                {"source": "pillar-2", "target": "cluster-2", "value": 2},
+                {"source": "pillar-2", "target": "cluster-4", "value": 2},
+                {"source": "pillar-2", "target": "cluster-7", "value": 2},
+                {"source": "pillar-2", "target": "cluster-8", "value": 2},
+                {"source": "pillar-2", "target": "support-3", "value": 1},
+                {"source": "pillar-3", "target": "cluster-6", "value": 2},
+                {"source": "pillar-3", "target": "support-6", "value": 1},
+                {"source": "pillar-4", "target": "cluster-5", "value": 2},
+                {"source": "pillar-5", "target": "cluster-5", "value": 2},
+                {"source": "cluster-4", "target": "support-4", "value": 1},
+                {"source": "cluster-8", "target": "support-5", "value": 1},
+                {"source": "cluster-10", "target": "support-2", "value": 1},
+                {"source": "pillar-1", "target": "pillar-2", "value": 3},
+                {"source": "pillar-2", "target": "pillar-4", "value": 3},
+                {"source": "pillar-1", "target": "pillar-3", "value": 3}
+            ]
+        };
+
+        const width = document.getElementById('cluster-graph').clientWidth || 1200;
+        const height = 600;
+
+        const svg = d3.select('#cluster-graph')
+            .append('svg')
+            .attr('width', '100%')
+            .attr('height', height)
+            .attr('viewBox', [0, 0, width, height]);
+
+        const simulation = d3.forceSimulation(graphData.nodes)
+            .force('link', d3.forceLink(graphData.links).id(d => d.id).distance(120))
+            .force('charge', d3.forceManyBody().strength(-400))
+            .force('center', d3.forceCenter(width / 2, height / 2))
+            .force('collision', d3.forceCollide().radius(60));
+
+        const link = svg.append('g')
+            .selectAll('line')
+            .data(graphData.links)
+            .join('line')
+            .attr('class', 'link')
+            .attr('stroke-width', d => Math.sqrt(d.value) * 1.5);
+
+        const node = svg.append('g')
+            .selectAll('g')
+            .data(graphData.nodes)
+            .join('g')
+            .attr('class', d => 'node node-' + d.type)
+            .call(d3.drag()
+                .on('start', dragstarted)
+                .on('drag', dragged)
+                .on('end', dragended));
+
+        node.append('circle')
+            .attr('r', d => d.type === 'pillar' ? 28 : d.type === 'cluster' ? 20 : 14);
+
+        node.append('text')
+            .attr('dx', d => d.type === 'pillar' ? 32 : d.type === 'cluster' ? 24 : 18)
+            .attr('dy', 4)
+            .text(d => d.name.length > 22 ? d.name.substring(0, 22) + '...' : d.name);
+
+        // Tooltip
+        const tooltip = d3.select('body').append('div')
+            .attr('class', 'tooltip')
+            .style('opacity', 0);
+
+        node.on('mouseover', function(event, d) {
+            tooltip.transition().duration(200).style('opacity', .9);
+            tooltip.html(`<strong>${d.name}</strong><br>Type: ${d.type.charAt(0).toUpperCase() + d.type.slice(1)}<br>Priority: ${d.priority}`)
+                .style('left', (event.pageX + 10) + 'px')
+                .style('top', (event.pageY - 28) + 'px');
+        })
+        .on('mouseout', function() {
+            tooltip.transition().duration(500).style('opacity', 0);
+        });
+
+        simulation.on('tick', () => {
+            link
+                .attr('x1', d => d.source.x)
+                .attr('y1', d => d.source.y)
+                .attr('x2', d => d.target.x)
+                .attr('y2', d => d.target.y);
+
+            node.attr('transform', d => `translate(${d.x},${d.y})`);
+        });
+
+        function dragstarted(event) {
+            if (!event.active) simulation.alphaTarget(0.3).restart();
+            event.subject.fx = event.subject.x;
+            event.subject.fy = event.subject.y;
+        }
+
+        function dragged(event) {
+            event.subject.fx = event.x;
+            event.subject.fy = event.y;
+        }
+
+        function dragended(event) {
+            if (!event.active) simulation.alphaTarget(0);
+            event.subject.fx = null;
+            event.subject.fy = null;
+        }
+    </script>
+</body>
+</html>

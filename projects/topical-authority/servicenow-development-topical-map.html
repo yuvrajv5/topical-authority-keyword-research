@@ -1,0 +1,1490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Topical Authority Map: ServiceNow Development</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        :root {
+            --primary: #032d60;
+            --primary-light: #0b5cab;
+            --success: #16a34a;
+            --warning: #ca8a04;
+            --danger: #dc2626;
+            --accent: #81b5a1;
+            --gray-50: #f9fafb;
+            --gray-100: #f3f4f6;
+            --gray-200: #e5e7eb;
+            --gray-300: #d1d5db;
+            --gray-600: #4b5563;
+            --gray-700: #374151;
+            --gray-800: #1f2937;
+            --gray-900: #111827;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: var(--gray-50);
+            color: var(--gray-800);
+            line-height: 1.6;
+        }
+
+        .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+
+        header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            color: white;
+            padding: 40px 20px;
+            margin-bottom: 30px;
+            border-radius: 12px;
+        }
+
+        header h1 { font-size: 2.5rem; margin-bottom: 10px; }
+        header .meta { opacity: 0.9; font-size: 0.95rem; }
+        header .meta span { margin-right: 20px; }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .stat-card .number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .stat-card .label {
+            color: var(--gray-600);
+            font-size: 0.9rem;
+            margin-top: 5px;
+        }
+
+        .section {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+            overflow: hidden;
+        }
+
+        .section-header {
+            background: var(--gray-100);
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--gray-200);
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .section-header h2 {
+            font-size: 1.25rem;
+            color: var(--gray-800);
+        }
+
+        .section-header .toggle {
+            font-size: 1.5rem;
+            color: var(--gray-600);
+            transition: transform 0.3s;
+        }
+
+        .section-header.collapsed .toggle { transform: rotate(-90deg); }
+
+        .section-content { padding: 24px; }
+        .section-content.hidden { display: none; }
+
+        #cluster-graph {
+            width: 100%;
+            height: 650px;
+            border: 1px solid var(--gray-200);
+            border-radius: 8px;
+            background: white;
+        }
+
+        .node { cursor: pointer; }
+        .node circle { stroke: white; stroke-width: 2px; }
+        .node text { font-size: 11px; fill: var(--gray-700); }
+        .link { stroke: var(--gray-300); stroke-opacity: 0.6; }
+
+        .node-pillar circle { fill: var(--primary); }
+        .node-cluster circle { fill: var(--success); }
+        .node-supporting circle { fill: var(--warning); }
+
+        .legend {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+        }
+
+        .legend-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .table-container { overflow-x: auto; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 800px;
+        }
+
+        th, td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--gray-200);
+        }
+
+        th {
+            background: var(--gray-50);
+            font-weight: 600;
+            color: var(--gray-700);
+            position: sticky;
+            top: 0;
+            cursor: pointer;
+        }
+
+        th:hover { background: var(--gray-100); }
+        tr:hover { background: var(--gray-50); }
+
+        .priority-high {
+            background: #dcfce7;
+            color: #166534;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            display: inline-block;
+        }
+
+        .priority-medium {
+            background: #fef9c3;
+            color: #854d0e;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            display: inline-block;
+        }
+
+        .priority-low {
+            background: var(--gray-100);
+            color: var(--gray-600);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            display: inline-block;
+        }
+
+        .intent-info { color: #2563eb; font-weight: 500; }
+        .intent-commercial { color: #7c3aed; font-weight: 500; }
+        .intent-transactional { color: #059669; font-weight: 500; }
+
+        .cluster-tag {
+            background: var(--primary);
+            color: white;
+            padding: 3px 10px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            white-space: nowrap;
+            display: inline-block;
+        }
+
+        .cluster-tag.fundamentals { background: #032d60; }
+        .cluster-tag.scripting { background: #7c3aed; }
+        .cluster-tag.tools { background: #059669; }
+        .cluster-tag.career { background: #d97706; }
+        .cluster-tag.integration { background: #0891b2; }
+        .cluster-tag.automation { background: #dc2626; }
+        .cluster-tag.ai { background: #6366f1; }
+
+        .roadmap-phase {
+            border-left: 4px solid var(--primary);
+            padding-left: 20px;
+            margin-bottom: 30px;
+        }
+
+        .roadmap-phase.phase-2 { border-left-color: var(--success); }
+        .roadmap-phase.phase-3 { border-left-color: var(--warning); }
+
+        .roadmap-phase h3 {
+            color: var(--primary);
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+        }
+
+        .roadmap-phase.phase-2 h3 { color: var(--success); }
+        .roadmap-phase.phase-3 h3 { color: var(--warning); }
+
+        .roadmap-item {
+            background: var(--gray-50);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+        }
+
+        .roadmap-item .title { font-weight: 600; margin-bottom: 5px; }
+        .roadmap-item .rationale { color: var(--gray-600); font-size: 0.9rem; }
+        .roadmap-item .links-to { color: var(--primary); font-size: 0.85rem; margin-top: 5px; }
+
+        .competitor-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+        }
+
+        .competitor-card {
+            border: 1px solid var(--gray-200);
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .competitor-card h4 { color: var(--primary); margin-bottom: 10px; font-size: 1.1rem; }
+        .competitor-card .content-count { color: var(--gray-600); font-size: 0.9rem; margin-bottom: 10px; }
+        .competitor-card .strengths { color: var(--success); margin-bottom: 8px; }
+        .competitor-card .weaknesses { color: var(--danger); }
+        .competitor-card ul { margin-left: 20px; font-size: 0.9rem; }
+
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .search-input {
+            flex: 1;
+            min-width: 200px;
+            padding: 10px 15px;
+            border: 1px solid var(--gray-300);
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+
+        .filter-select {
+            padding: 10px 15px;
+            border: 1px solid var(--gray-300);
+            border-radius: 8px;
+            font-size: 1rem;
+            background: white;
+        }
+
+        .order-number {
+            background: var(--primary);
+            color: white;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+
+        .linking-diagram {
+            background: var(--gray-50);
+            padding: 20px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 0.9rem;
+            white-space: pre;
+            overflow-x: auto;
+            margin-bottom: 20px;
+        }
+
+        .linking-rules {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+        }
+
+        .linking-rule {
+            background: var(--gray-50);
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 3px solid var(--primary);
+        }
+
+        .linking-rule strong { color: var(--primary); }
+
+        @media print {
+            .section-header .toggle { display: none; }
+            .section-content.hidden { display: block !important; }
+            .controls { display: none; }
+        }
+
+        .tooltip {
+            position: absolute;
+            background: var(--gray-800);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            pointer-events: none;
+            z-index: 1000;
+            max-width: 300px;
+        }
+
+        .summary-text {
+            font-size: 1rem;
+            line-height: 1.8;
+        }
+
+        .summary-text p { margin-bottom: 15px; }
+
+        .market-stats {
+            background: var(--gray-50);
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin: 15px 0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .market-stat { text-align: center; }
+
+        .market-stat .value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .market-stat .label {
+            font-size: 0.85rem;
+            color: var(--gray-600);
+        }
+
+        .tech-badge {
+            display: inline-block;
+            background: var(--gray-100);
+            color: var(--gray-700);
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            margin: 2px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Topical Authority Map: ServiceNow Development</h1>
+            <div class="meta">
+                <span>Generated: December 18, 2025</span>
+                <span>Target Market: USA</span>
+                <span>Total Keywords: 90+</span>
+            </div>
+        </header>
+
+        <!-- Stats Overview -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="number">6</div>
+                <div class="label">Pillar Topics</div>
+            </div>
+            <div class="stat-card">
+                <div class="number">16</div>
+                <div class="label">Cluster Topics</div>
+            </div>
+            <div class="stat-card">
+                <div class="number">22</div>
+                <div class="label">High Priority Keywords</div>
+            </div>
+            <div class="stat-card">
+                <div class="number">8</div>
+                <div class="label">Competitors Analyzed</div>
+            </div>
+        </div>
+
+        <!-- Executive Summary -->
+        <div class="section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h2>Executive Summary</h2>
+                <span class="toggle">&#9660;</span>
+            </div>
+            <div class="section-content">
+                <div class="summary-text">
+                    <p><strong>ServiceNow Development</strong> represents a high-value, growing market with strong career prospects and enterprise demand. More than 80% of Fortune 500 companies use ServiceNow, creating consistent demand for skilled developers. The topic spans <strong>scripting</strong> (GlideRecord, Business Rules, Client Scripts), <strong>low-code development</strong> (Flow Designer, App Engine Studio), <strong>integrations</strong> (REST APIs, IntegrationHub), and emerging <strong>AI/GenAI capabilities</strong> (Now Assist).</p>
+
+                    <div class="market-stats">
+                        <div class="market-stat">
+                            <div class="value">$122K</div>
+                            <div class="label">Avg Developer Salary (US)</div>
+                        </div>
+                        <div class="market-stat">
+                            <div class="value">80%+</div>
+                            <div class="label">Fortune 500 Adoption</div>
+                        </div>
+                        <div class="market-stat">
+                            <div class="value">20-40%</div>
+                            <div class="label">Cert Premium on Salary</div>
+                        </div>
+                        <div class="market-stat">
+                            <div class="value">50%</div>
+                            <div class="label">AI Workload Reduction</div>
+                        </div>
+                    </div>
+
+                    <p>Key content opportunities exist in <strong>beginner tutorials</strong> (high search volume, moderate competition), <strong>scripting guides</strong> (GlideRecord, Script Includes), <strong>certification preparation</strong>, and the emerging <strong>AI/GenAI integration</strong> space. Competition comes primarily from official ServiceNow documentation and community, plus training providers like Udemy and specialized blogs.</p>
+
+                    <p><strong>Recommended Strategy:</strong> Build pillar content around fundamentals and scripting first (high search volume), then expand into certification guides, tool-specific tutorials (Flow Designer, App Engine Studio), and career content. The AI/GenAI angle is emerging and presents an early-mover opportunity.</p>
+
+                    <p><strong>Key Technologies:</strong>
+                        <span class="tech-badge">JavaScript</span>
+                        <span class="tech-badge">GlideRecord</span>
+                        <span class="tech-badge">Flow Designer</span>
+                        <span class="tech-badge">REST APIs</span>
+                        <span class="tech-badge">App Engine Studio</span>
+                        <span class="tech-badge">UI Builder</span>
+                        <span class="tech-badge">Now Assist (GenAI)</span>
+                        <span class="tech-badge">IntegrationHub</span>
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Interactive Cluster Visualization -->
+        <div class="section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h2>Topic Cluster Visualization</h2>
+                <span class="toggle">&#9660;</span>
+            </div>
+            <div class="section-content">
+                <p style="margin-bottom: 15px; color: var(--gray-600);">
+                    Interactive map showing topic relationships. <strong>Drag nodes</strong> to explore connections.
+                    <strong style="color: var(--primary);">Blue = Pillar (write first)</strong>,
+                    <strong style="color: var(--success);">Green = Cluster (write second)</strong>,
+                    <strong style="color: var(--warning);">Orange = Supporting (write last)</strong>
+                </p>
+                <div id="cluster-graph"></div>
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-dot" style="background: var(--primary);"></div>
+                        <span>Pillar Content (Priority 1 - Write First)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-dot" style="background: var(--success);"></div>
+                        <span>Cluster Content (Priority 2)</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-dot" style="background: var(--warning);"></div>
+                        <span>Supporting Content (Priority 3)</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Content Priority Order -->
+        <div class="section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h2>Content Creation Order (What to Write First)</h2>
+                <span class="toggle">&#9660;</span>
+            </div>
+            <div class="section-content">
+                <p style="margin-bottom: 20px; color: var(--gray-600);">Follow this order to build topical authority systematically. Start with pillars to establish your hub pages, then expand with clusters.</p>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Order</th>
+                                <th>Content Topic</th>
+                                <th>Type</th>
+                                <th>Cluster</th>
+                                <th>Priority Score</th>
+                                <th>Why Write This</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><span class="order-number">1</span></td>
+                                <td><strong>What is ServiceNow Development? Complete Guide</strong></td>
+                                <td><span class="cluster-tag fundamentals">Pillar</span></td>
+                                <td>Fundamentals</td>
+                                <td><span class="priority-high">9.2</span></td>
+                                <td>Foundation content - high search volume, establishes authority</td>
+                            </tr>
+                            <tr>
+                                <td><span class="order-number">2</span></td>
+                                <td><strong>ServiceNow Scripting Guide: Business Rules, Client Scripts & More</strong></td>
+                                <td><span class="cluster-tag scripting">Pillar</span></td>
+                                <td>Scripting</td>
+                                <td><span class="priority-high">9.0</span></td>
+                                <td>Core developer skill - essential for all SN developers</td>
+                            </tr>
+                            <tr>
+                                <td><span class="order-number">3</span></td>
+                                <td><strong>ServiceNow Developer Certification Guide (CAD)</strong></td>
+                                <td><span class="cluster-tag career">Pillar</span></td>
+                                <td>Career</td>
+                                <td><span class="priority-high">8.8</span></td>
+                                <td>High commercial intent, certification drives traffic</td>
+                            </tr>
+                            <tr>
+                                <td><span class="order-number">4</span></td>
+                                <td><strong>ServiceNow GlideRecord Tutorial: Complete Guide with Examples</strong></td>
+                                <td><span class="cluster-tag scripting">Pillar</span></td>
+                                <td>Scripting</td>
+                                <td><span class="priority-high">8.7</span></td>
+                                <td>Most searched scripting concept in ServiceNow</td>
+                            </tr>
+                            <tr>
+                                <td><span class="order-number">5</span></td>
+                                <td><strong>ServiceNow Flow Designer: Complete Automation Guide</strong></td>
+                                <td><span class="cluster-tag automation">Pillar</span></td>
+                                <td>Automation</td>
+                                <td><span class="priority-high">8.6</span></td>
+                                <td>Key no-code tool, growing adoption</td>
+                            </tr>
+                            <tr>
+                                <td><span class="order-number">6</span></td>
+                                <td><strong>ServiceNow REST API Integration Guide</strong></td>
+                                <td><span class="cluster-tag integration">Pillar</span></td>
+                                <td>Integration</td>
+                                <td><span class="priority-high">8.5</span></td>
+                                <td>Essential for enterprise implementations</td>
+                            </tr>
+                            <tr>
+                                <td><span class="order-number">7</span></td>
+                                <td>ServiceNow Development for Beginners</td>
+                                <td><span class="cluster-tag fundamentals">Cluster</span></td>
+                                <td>Fundamentals</td>
+                                <td><span class="priority-high">8.4</span></td>
+                                <td>Entry-level content, high search volume</td>
+                            </tr>
+                            <tr>
+                                <td><span class="order-number">8</span></td>
+                                <td>ServiceNow Business Rules Tutorial</td>
+                                <td><span class="cluster-tag scripting">Cluster</span></td>
+                                <td>Scripting</td>
+                                <td><span class="priority-high">8.3</span></td>
+                                <td>Core scripting concept</td>
+                            </tr>
+                            <tr>
+                                <td><span class="order-number">9</span></td>
+                                <td>ServiceNow Client Scripts Guide</td>
+                                <td><span class="cluster-tag scripting">Cluster</span></td>
+                                <td>Scripting</td>
+                                <td><span class="priority-high">8.2</span></td>
+                                <td>Essential client-side scripting</td>
+                            </tr>
+                            <tr>
+                                <td><span class="order-number">10</span></td>
+                                <td>ServiceNow Developer Salary Guide 2025</td>
+                                <td><span class="cluster-tag career">Cluster</span></td>
+                                <td>Career</td>
+                                <td><span class="priority-high">8.1</span></td>
+                                <td>High search volume career content</td>
+                            </tr>
+                            <tr>
+                                <td><span class="order-number">11</span></td>
+                                <td>ServiceNow App Engine Studio Guide</td>
+                                <td><span class="cluster-tag tools">Cluster</span></td>
+                                <td>Tools</td>
+                                <td><span class="priority-high">8.0</span></td>
+                                <td>Low-code development trending</td>
+                            </tr>
+                            <tr>
+                                <td><span class="order-number">12</span></td>
+                                <td>ServiceNow vs Jira: Complete Comparison</td>
+                                <td><span class="cluster-tag fundamentals">Cluster</span></td>
+                                <td>Comparison</td>
+                                <td><span class="priority-high">8.0</span></td>
+                                <td>High-traffic comparison content</td>
+                            </tr>
+                            <tr>
+                                <td><span class="order-number">13</span></td>
+                                <td>ServiceNow Script Include Tutorial</td>
+                                <td><span class="cluster-tag scripting">Cluster</span></td>
+                                <td>Scripting</td>
+                                <td><span class="priority-high">7.9</span></td>
+                                <td>Server-side reusable code</td>
+                            </tr>
+                            <tr>
+                                <td><span class="order-number">14</span></td>
+                                <td>ServiceNow Developer Interview Questions</td>
+                                <td><span class="cluster-tag career">Cluster</span></td>
+                                <td>Career</td>
+                                <td><span class="priority-high">7.9</span></td>
+                                <td>High intent job seeker content</td>
+                            </tr>
+                            <tr>
+                                <td><span class="order-number">15</span></td>
+                                <td>ServiceNow GenAI / Now Assist Development Guide</td>
+                                <td><span class="cluster-tag ai">Cluster</span></td>
+                                <td>AI</td>
+                                <td><span class="priority-high">7.8</span></td>
+                                <td>Emerging trend, early mover advantage</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Keyword Database -->
+        <div class="section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h2>Complete Keyword Database</h2>
+                <span class="toggle">&#9660;</span>
+            </div>
+            <div class="section-content">
+                <div class="controls">
+                    <input type="text" class="search-input" id="keyword-search" placeholder="Search keywords..." onkeyup="filterTable()">
+                    <select class="filter-select" id="intent-filter" onchange="filterTable()">
+                        <option value="">All Intents</option>
+                        <option value="Informational">Informational</option>
+                        <option value="Commercial">Commercial</option>
+                        <option value="Transactional">Transactional</option>
+                    </select>
+                    <select class="filter-select" id="priority-filter" onchange="filterTable()">
+                        <option value="">All Priorities</option>
+                        <option value="high">High (7+)</option>
+                        <option value="medium">Medium (4-6)</option>
+                        <option value="low">Low (&lt;4)</option>
+                    </select>
+                    <select class="filter-select" id="cluster-filter" onchange="filterTable()">
+                        <option value="">All Clusters</option>
+                        <option value="Fundamentals">Fundamentals</option>
+                        <option value="Scripting">Scripting</option>
+                        <option value="Career">Career</option>
+                        <option value="Automation">Automation</option>
+                        <option value="Integration">Integration</option>
+                        <option value="Tools">Tools</option>
+                        <option value="AI">AI</option>
+                        <option value="Comparison">Comparison</option>
+                    </select>
+                </div>
+                <div class="table-container">
+                    <table id="keyword-table">
+                        <thead>
+                            <tr>
+                                <th onclick="sortTable(0)">Keyword</th>
+                                <th onclick="sortTable(1)">Cluster</th>
+                                <th onclick="sortTable(2)">Intent</th>
+                                <th onclick="sortTable(3)">Competition</th>
+                                <th onclick="sortTable(4)">Priority</th>
+                                <th onclick="sortTable(5)">Suggested Content</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr data-priority="9.2">
+                                <td>what is servicenow development</td>
+                                <td>Fundamentals</td>
+                                <td><span class="intent-info">Informational</span></td>
+                                <td>Medium</td>
+                                <td><span class="priority-high">9.2</span></td>
+                                <td>Pillar: Complete Guide</td>
+                            </tr>
+                            <tr data-priority="9.0">
+                                <td>servicenow scripting</td>
+                                <td>Scripting</td>
+                                <td><span class="intent-info">Informational</span></td>
+                                <td>Medium</td>
+                                <td><span class="priority-high">9.0</span></td>
+                                <td>Pillar: Scripting Guide</td>
+                            </tr>
+                            <tr data-priority="8.8">
+                                <td>servicenow developer certification</td>
+                                <td>Career</td>
+                                <td><span class="intent-commercial">Commercial</span></td>
+                                <td>Medium</td>
+                                <td><span class="priority-high">8.8</span></td>
+                                <td>Pillar: Certification Guide</td>
+                            </tr>
+                            <tr data-priority="8.7">
+                                <td>servicenow gliderecord</td>
+                                <td>Scripting</td>
+                                <td><span class="intent-info">Informational</span></td>
+                                <td>Medium</td>
+                                <td><span class="priority-high">8.7</span></td>
+                                <td>Pillar: GlideRecord Tutorial</td>
+                            </tr>
+                            <tr data-priority="8.6">
+                                <td>servicenow flow designer</td>
+                                <td>Automation</td>
+                                <td><span class="intent-info">Informational</span></td>
+                                <td>Medium</td>
+                                <td><span class="priority-high">8.6</span></td>
+                                <td>Pillar: Flow Designer Guide</td>
+                            </tr>
+                            <tr data-priority="8.5">
+                                <td>servicenow rest api</td>
+                                <td>Integration</td>
+                                <td><span class="intent-info">Informational</span></td>
+                                <td>Medium</td>
+                                <td><span class="priority-high">8.5</span></td>
+                                <td>Pillar: API Integration Guide</td>
+                            </tr>
+                            <tr data-priority="8.4">
+                                <td>servicenow development for beginners</td>
+                                <td>Fundamentals</td>
+                                <td><span class="intent-info">Informational</span></td>
+                                <td>Low</td>
+                                <td><span class="priority-high">8.4</span></td>
+                                <td>Cluster: Beginner Guide</td>
+                            </tr>
+                            <tr data-priority="8.3">
+                                <td>servicenow business rules</td>
+                                <td>Scripting</td>
+                                <td><span class="intent-info">Informational</span></td>
+                                <td>Medium</td>
+                                <td><span class="priority-high">8.3</span></td>
+                                <td>Cluster: Business Rules</td>
+                            </tr>
+                            <tr data-priority="8.2">
+                                <td>servicenow client scripts</td>
+                                <td>Scripting</td>
+                                <td><span class="intent-info">Informational</span></td>
+                                <td>Medium</td>
+                                <td><span class="priority-high">8.2</span></td>
+                                <td>Cluster: Client Scripts</td>
+                            </tr>
+                            <tr data-priority="8.1">
+                                <td>servicenow developer salary</td>
+                                <td>Career</td>
+                                <td><span class="intent-commercial">Commercial</span></td>
+                                <td>Low</td>
+                                <td><span class="priority-high">8.1</span></td>
+                                <td>Cluster: Salary Guide</td>
+                            </tr>
+                            <tr data-priority="8.0">
+                                <td>servicenow app engine studio</td>
+                                <td>Tools</td>
+                                <td><span class="intent-info">Informational</span></td>
+                                <td>Low</td>
+                                <td><span class="priority-high">8.0</span></td>
+                                <td>Cluster: App Engine Guide</td>
+                            </tr>
+                            <tr data-priority="8.0">
+                                <td>servicenow vs jira</td>
+                                <td>Comparison</td>
+                                <td><span class="intent-commercial">Commercial</span></td>
+                                <td>Medium</td>
+                                <td><span class="priority-high">8.0</span></td>
+                                <td>Cluster: Comparison</td>
+                            </tr>
+                            <tr data-priority="7.9">
+                                <td>servicenow script include</td>
+                                <td>Scripting</td>
+                                <td><span class="intent-info">Informational</span></td>
+                                <td>Low</td>
+                                <td><span class="priority-high">7.9</span></td>
+                                <td>Cluster: Script Include</td>
+                            </tr>
+                            <tr data-priority="7.9">
+                                <td>servicenow developer interview questions</td>
+                                <td>Career</td>
+                                <td><span class="intent-info">Informational</span></td>
+                                <td>Medium</td>
+                                <td><span class="priority-high">7.9</span></td>
+                                <td>Cluster: Interview Prep</td>
+                            </tr>
+                            <tr data-priority="7.8">
+                                <td>servicenow genai now assist</td>
+                                <td>AI</td>
+                                <td><span class="intent-info">Informational</span></td>
+                                <td>Low</td>
+                                <td><span class="priority-high">7.8</span></td>
+                                <td>Cluster: AI/GenAI Guide</td>
+                            </tr>
+                            <tr data-priority="7.8">
+                                <td>servicenow development best practices</td>
+                                <td>Fundamentals</td>
+                                <td><span class="intent-info">Informational</span></td>
+                                <td>Medium</td>
+                                <td><span class="priority-high">7.8</span></td>
+                                <td>Cluster: Best Practices</td>
+                            </tr>
+                            <tr data-priority="7.7">
+                                <td>servicenow ui builder</td>
+                                <td>Tools</td>
+                                <td><span class="intent-info">Informational</span></td>
+                                <td>Low</td>
+                                <td><span class="priority-high">7.7</span></td>
+                                <td>Cluster: UI Builder Guide</td>
+                            </tr>
+                            <tr data-priority="7.6">
+                                <td>servicenow personal developer instance</td>
+                                <td>Tools</td>
+                                <td><span class="intent-info">Informational</span></td>
+                                <td>Low</td>
+                                <td><span class="priority-high">7.6</span></td>
+                                <td>Cluster: PDI Guide</td>
+                            </tr>
+                            <tr data-priority="7.5">
+                                <td>servicenow integration hub</td>
+                                <td>Integration</td>
+                                <td><span class="intent-info">Informational</span></td>
+                                <td>Low</td>
+                                <td><span class="priority-high">7.5</span></td>
+                                <td>Cluster: IntegrationHub</td>
+                            </tr>
+                            <tr data-priority="7.4">
+                                <td>servicenow ui policies</td>
+                                <td>Scripting</td>
+                                <td><span class="intent-info">Informational</span></td>
+                                <td>Low</td>
+                                <td><span class="priority-high">7.4</span></td>
+                                <td>Cluster: UI Policies</td>
+                            </tr>
+                            <tr data-priority="7.3">
+                                <td>how to become servicenow developer</td>
+                                <td>Career</td>
+                                <td><span class="intent-info">Informational</span></td>
+                                <td>Low</td>
+                                <td><span class="priority-high">7.3</span></td>
+                                <td>Cluster: Career Path</td>
+                            </tr>
+                            <tr data-priority="7.2">
+                                <td>servicenow debugging</td>
+                                <td>Tools</td>
+                                <td><span class="intent-info">Informational</span></td>
+                                <td>Low</td>
+                                <td><span class="priority-high">7.2</span></td>
+                                <td>Cluster: Debugging Guide</td>
+                            </tr>
+                            <tr data-priority="7.1">
+                                <td>servicenow workflow vs flow designer</td>
+                                <td>Automation</td>
+                                <td><span class="intent-commercial">Commercial</span></td>
+                                <td>Low</td>
+                                <td><span class="priority-high">7.1</span></td>
+                                <td>Cluster: Comparison</td>
+                            </tr>
+                            <tr data-priority="7.0">
+                                <td>servicenow custom application development</td>
+                                <td>Tools</td>
+                                <td><span class="intent-info">Informational</span></td>
+                                <td>Low</td>
+                                <td><span class="priority-high">7.0</span></td>
+                                <td>Cluster: App Dev Guide</td>
+                            </tr>
+                            <tr data-priority="6.9">
+                                <td>servicenow itsm development</td>
+                                <td>Fundamentals</td>
+                                <td><span class="intent-info">Informational</span></td>
+                                <td>Medium</td>
+                                <td><span class="priority-medium">6.9</span></td>
+                                <td>ITSM customization guide</td>
+                            </tr>
+                            <tr data-priority="6.8">
+                                <td>servicenow glideajax</td>
+                                <td>Scripting</td>
+                                <td><span class="intent-info">Informational</span></td>
+                                <td>Low</td>
+                                <td><span class="priority-medium">6.8</span></td>
+                                <td>Advanced scripting</td>
+                            </tr>
+                            <tr data-priority="6.7">
+                                <td>servicenow update sets</td>
+                                <td>Tools</td>
+                                <td><span class="intent-info">Informational</span></td>
+                                <td>Low</td>
+                                <td><span class="priority-medium">6.7</span></td>
+                                <td>Development workflow</td>
+                            </tr>
+                            <tr data-priority="6.6">
+                                <td>servicenow vs salesforce</td>
+                                <td>Comparison</td>
+                                <td><span class="intent-commercial">Commercial</span></td>
+                                <td>High</td>
+                                <td><span class="priority-medium">6.6</span></td>
+                                <td>Platform comparison</td>
+                            </tr>
+                            <tr data-priority="6.5">
+                                <td>servicenow acl</td>
+                                <td>Scripting</td>
+                                <td><span class="intent-info">Informational</span></td>
+                                <td>Low</td>
+                                <td><span class="priority-medium">6.5</span></td>
+                                <td>Security scripting</td>
+                            </tr>
+                            <tr data-priority="6.4">
+                                <td>servicenow developer training</td>
+                                <td>Career</td>
+                                <td><span class="intent-commercial">Commercial</span></td>
+                                <td>High</td>
+                                <td><span class="priority-medium">6.4</span></td>
+                                <td>Training resources</td>
+                            </tr>
+                            <tr data-priority="6.3">
+                                <td>servicenow catalog item development</td>
+                                <td>Tools</td>
+                                <td><span class="intent-info">Informational</span></td>
+                                <td>Low</td>
+                                <td><span class="priority-medium">6.3</span></td>
+                                <td>Service Catalog guide</td>
+                            </tr>
+                            <tr data-priority="6.2">
+                                <td>xplore servicenow</td>
+                                <td>Tools</td>
+                                <td><span class="intent-info">Informational</span></td>
+                                <td>Low</td>
+                                <td><span class="priority-medium">6.2</span></td>
+                                <td>Developer tool guide</td>
+                            </tr>
+                            <tr data-priority="6.1">
+                                <td>servicenow atf testing</td>
+                                <td>Tools</td>
+                                <td><span class="intent-info">Informational</span></td>
+                                <td>Low</td>
+                                <td><span class="priority-medium">6.1</span></td>
+                                <td>Testing framework</td>
+                            </tr>
+                            <tr data-priority="6.0">
+                                <td>servicenow service portal development</td>
+                                <td>Tools</td>
+                                <td><span class="intent-info">Informational</span></td>
+                                <td>Medium</td>
+                                <td><span class="priority-medium">6.0</span></td>
+                                <td>Portal development</td>
+                            </tr>
+                            <tr data-priority="5.8">
+                                <td>servicenow agentic ai</td>
+                                <td>AI</td>
+                                <td><span class="intent-info">Informational</span></td>
+                                <td>Low</td>
+                                <td><span class="priority-medium">5.8</span></td>
+                                <td>AI agents guide</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Competitive Landscape -->
+        <div class="section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h2>Competitive Landscape</h2>
+                <span class="toggle">&#9660;</span>
+            </div>
+            <div class="section-content">
+                <div class="competitor-grid">
+                    <div class="competitor-card">
+                        <h4>developer.servicenow.com</h4>
+                        <div class="content-count">Official | 500+ content pieces</div>
+                        <div class="strengths">
+                            <strong>Strengths:</strong>
+                            <ul>
+                                <li>Official documentation & tutorials</li>
+                                <li>Free developer instances</li>
+                                <li>Highest authority</li>
+                            </ul>
+                        </div>
+                        <div class="weaknesses">
+                            <strong>Weaknesses:</strong>
+                            <ul>
+                                <li>Dense, technical writing</li>
+                                <li>Hard for beginners to navigate</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="competitor-card">
+                        <h4>servicenow.com/community</h4>
+                        <div class="content-count">Community | 1000+ discussions</div>
+                        <div class="strengths">
+                            <strong>Strengths:</strong>
+                            <ul>
+                                <li>Real-world Q&A</li>
+                                <li>Active community</li>
+                                <li>Diverse use cases</li>
+                            </ul>
+                        </div>
+                        <div class="weaknesses">
+                            <strong>Weaknesses:</strong>
+                            <ul>
+                                <li>Unstructured content</li>
+                                <li>Varying quality</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="competitor-card">
+                        <h4>servicenowguru.com</h4>
+                        <div class="content-count">Blog | 100+ articles</div>
+                        <div class="strengths">
+                            <strong>Strengths:</strong>
+                            <ul>
+                                <li>Practical code examples</li>
+                                <li>GlideRecord cheat sheets</li>
+                                <li>Long-standing authority</li>
+                            </ul>
+                        </div>
+                        <div class="weaknesses">
+                            <strong>Weaknesses:</strong>
+                            <ul>
+                                <li>Some outdated content</li>
+                                <li>Limited modern features</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="competitor-card">
+                        <h4>servicenowelite.com</h4>
+                        <div class="content-count">Blog | 50+ articles</div>
+                        <div class="strengths">
+                            <strong>Strengths:</strong>
+                            <ul>
+                                <li>In-depth tutorials</li>
+                                <li>Step-by-step guides</li>
+                                <li>Well-organized content</li>
+                            </ul>
+                        </div>
+                        <div class="weaknesses">
+                            <strong>Weaknesses:</strong>
+                            <ul>
+                                <li>Limited topic coverage</li>
+                                <li>Infrequent updates</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="competitor-card">
+                        <h4>udemy.com (ServiceNow)</h4>
+                        <div class="content-count">Training | 20+ courses</div>
+                        <div class="strengths">
+                            <strong>Strengths:</strong>
+                            <ul>
+                                <li>Video-based learning</li>
+                                <li>Certification prep</li>
+                                <li>Structured curriculum</li>
+                            </ul>
+                        </div>
+                        <div class="weaknesses">
+                            <strong>Weaknesses:</strong>
+                            <ul>
+                                <li>Paid content</li>
+                                <li>Not SEO-indexed (written)</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="competitor-card">
+                        <h4>coursera.org / mindmajix.com</h4>
+                        <div class="content-count">Training/Blog | 30+ resources</div>
+                        <div class="strengths">
+                            <strong>Strengths:</strong>
+                            <ul>
+                                <li>Career-focused content</li>
+                                <li>Good interview prep</li>
+                                <li>Certification guides</li>
+                            </ul>
+                        </div>
+                        <div class="weaknesses">
+                            <strong>Weaknesses:</strong>
+                            <ul>
+                                <li>Generic, less technical depth</li>
+                                <li>Focus on promotion</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <h3 style="margin-top: 30px; margin-bottom: 15px;">Content Gap Opportunities</h3>
+                <div class="linking-rules">
+                    <div class="linking-rule">
+                        <strong>Beginner-Friendly Comprehensive Guides</strong><br>
+                        Official docs are dense. Opportunity for approachable, step-by-step learning paths for newcomers.
+                    </div>
+                    <div class="linking-rule">
+                        <strong>Modern Feature Coverage (Flow Designer, UI Builder)</strong><br>
+                        Many blogs focus on legacy scripting. Gap in modern low-code/no-code feature tutorials.
+                    </div>
+                    <div class="linking-rule">
+                        <strong>AI/GenAI Development Guides</strong><br>
+                        Now Assist and GenAI features are new (2024-2025). Very limited educational content exists.
+                    </div>
+                    <div class="linking-rule">
+                        <strong>Video + Written Hybrid Content</strong><br>
+                        Text blogs dominate. Opportunity for tutorial content with embedded videos/GIFs.
+                    </div>
+                    <div class="linking-rule">
+                        <strong>Updated Certification Guides (2025)</strong><br>
+                        Many CAD guides are outdated. Opportunity for current exam prep content.
+                    </div>
+                    <div class="linking-rule">
+                        <strong>Real-World Project Walkthroughs</strong><br>
+                        Limited end-to-end project tutorials. Gap for building complete applications from scratch.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Content Roadmap -->
+        <div class="section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h2>Recommended Content Roadmap</h2>
+                <span class="toggle">&#9660;</span>
+            </div>
+            <div class="section-content">
+                <div class="roadmap-phase">
+                    <h3>Phase 1: Foundation (Pillar Content) - Start Here</h3>
+                    <div class="roadmap-item">
+                        <div class="title">1. "What is ServiceNow Development? Complete Guide for 2025"</div>
+                        <div class="rationale">Foundation content covering: what SN development is, required skills (JavaScript, HTML, CSS), career paths, modules (ITSM, ITOM, HRSD), and getting started with PDI. Target: 4,000-5,000 words.</div>
+                    </div>
+                    <div class="roadmap-item">
+                        <div class="title">2. "ServiceNow Scripting Guide: Master Business Rules, Client Scripts & More"</div>
+                        <div class="rationale">Comprehensive scripting hub covering server-side vs client-side, when to use each, common APIs. Target: 5,000+ words with code examples.</div>
+                    </div>
+                    <div class="roadmap-item">
+                        <div class="title">3. "ServiceNow GlideRecord Tutorial: Complete Guide with Examples"</div>
+                        <div class="rationale">Most searched scripting concept. Cover queries, inserts, updates, deletes, best practices, and performance tips. Include cheat sheet.</div>
+                    </div>
+                </div>
+
+                <div class="roadmap-phase phase-2">
+                    <h3>Phase 2: Cluster Building</h3>
+                    <div class="roadmap-item">
+                        <div class="title">4. "ServiceNow Certified Application Developer (CAD) Guide 2025"</div>
+                        <div class="links-to">Links to: Pillar #1, Pillar #2, Career content</div>
+                    </div>
+                    <div class="roadmap-item">
+                        <div class="title">5. "ServiceNow Flow Designer: Complete Automation Guide"</div>
+                        <div class="links-to">Links to: Pillar #1, Best Practices</div>
+                    </div>
+                    <div class="roadmap-item">
+                        <div class="title">6. "ServiceNow Business Rules: Tutorial with Examples"</div>
+                        <div class="links-to">Links to: Pillar #2 (Scripting), GlideRecord</div>
+                    </div>
+                    <div class="roadmap-item">
+                        <div class="title">7. "ServiceNow Client Scripts Guide: onLoad, onChange, onSubmit"</div>
+                        <div class="links-to">Links to: Pillar #2 (Scripting), UI Policies</div>
+                    </div>
+                    <div class="roadmap-item">
+                        <div class="title">8. "ServiceNow REST API Integration: Complete Tutorial"</div>
+                        <div class="links-to">Links to: Pillar #1, IntegrationHub</div>
+                    </div>
+                    <div class="roadmap-item">
+                        <div class="title">9. "ServiceNow Developer Salary Guide 2025"</div>
+                        <div class="links-to">Links to: Career Path, Certification Guide</div>
+                    </div>
+                </div>
+
+                <div class="roadmap-phase phase-3">
+                    <h3>Phase 3: Long-tail Expansion</h3>
+                    <div class="roadmap-item">
+                        <div class="title">10. "ServiceNow vs Jira: Complete Comparison for ITSM"</div>
+                    </div>
+                    <div class="roadmap-item">
+                        <div class="title">11. "ServiceNow App Engine Studio: Low-Code Development Guide"</div>
+                    </div>
+                    <div class="roadmap-item">
+                        <div class="title">12. "ServiceNow Developer Interview Questions (2025)"</div>
+                    </div>
+                    <div class="roadmap-item">
+                        <div class="title">13. "ServiceNow Script Include Tutorial with GlideAjax Examples"</div>
+                    </div>
+                    <div class="roadmap-item">
+                        <div class="title">14. "ServiceNow GenAI / Now Assist Development Guide"</div>
+                    </div>
+                    <div class="roadmap-item">
+                        <div class="title">15. "ServiceNow UI Builder: Creating Custom Components"</div>
+                    </div>
+                    <div class="roadmap-item">
+                        <div class="title">16. "ServiceNow Development Best Practices: Avoid Technical Debt"</div>
+                    </div>
+                    <div class="roadmap-item">
+                        <div class="title">17. "ServiceNow Debugging Tools: Xplore, Script Debugger & More"</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Internal Linking Strategy -->
+        <div class="section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h2>Internal Linking Strategy</h2>
+                <span class="toggle">&#9660;</span>
+            </div>
+            <div class="section-content">
+                <h3 style="margin-bottom: 15px;">Hub-and-Spoke Model</h3>
+                <div class="linking-diagram">
+                    [Pillar: What is SN Development?]
+                              /    |    \
+                             /     |     \
+          [For Beginners] [Career Path] [Best Practices]
+                   \           |           /
+                    \          |          /
+                     [Pillar: Scripting Guide]
+                          /    |    \
+                         /     |     \
+          [Business Rules] [Client Scripts] [Script Includes]
+                              |
+                         [GlideRecord]
+                              |
+                   [Pillar: Flow Designer]
+                          /         \
+                         /           \
+              [Automation]    [IntegrationHub]
+                </div>
+
+                <h3 style="margin-top: 30px; margin-bottom: 15px;">Linking Rules</h3>
+                <div class="linking-rules">
+                    <div class="linking-rule">
+                        <strong>Rule 1: Scripting Content Links</strong><br>
+                        All scripting articles link to GlideRecord pillar and Scripting Guide pillar
+                    </div>
+                    <div class="linking-rule">
+                        <strong>Rule 2: Career Content Links</strong><br>
+                        Salary, interview, certification content interlinks and points to fundamentals pillar
+                    </div>
+                    <div class="linking-rule">
+                        <strong>Rule 3: Tool Guides Link to Scripting</strong><br>
+                        Flow Designer, UI Builder, App Engine all reference scripting when discussing advanced use cases
+                    </div>
+                    <div class="linking-rule">
+                        <strong>Rule 4: Comparison Content</strong><br>
+                        ServiceNow vs X articles link back to "What is SN Development" pillar
+                    </div>
+                    <div class="linking-rule">
+                        <strong>Rule 5: Code Examples Reference</strong><br>
+                        All code examples link to GlideRecord cheat sheet and best practices
+                    </div>
+                    <div class="linking-rule">
+                        <strong>Rule 6: Certification CTA</strong><br>
+                        Include certification guide CTA on all intermediate/advanced content
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function toggleSection(header) {
+            header.classList.toggle('collapsed');
+            const content = header.nextElementSibling;
+            content.classList.toggle('hidden');
+        }
+
+        function filterTable() {
+            const search = document.getElementById('keyword-search').value.toLowerCase();
+            const intent = document.getElementById('intent-filter').value;
+            const priority = document.getElementById('priority-filter').value;
+            const cluster = document.getElementById('cluster-filter').value;
+
+            const rows = document.querySelectorAll('#keyword-table tbody tr');
+
+            rows.forEach(row => {
+                const keyword = row.cells[0].textContent.toLowerCase();
+                const rowIntent = row.cells[2].textContent.trim();
+                const rowPriority = parseFloat(row.dataset.priority);
+                const rowCluster = row.cells[1].textContent;
+
+                let show = true;
+
+                if (search && !keyword.includes(search)) show = false;
+                if (intent && !rowIntent.includes(intent)) show = false;
+                if (cluster && rowCluster !== cluster) show = false;
+                if (priority === 'high' && rowPriority < 7) show = false;
+                if (priority === 'medium' && (rowPriority < 4 || rowPriority >= 7)) show = false;
+                if (priority === 'low' && rowPriority >= 4) show = false;
+
+                row.style.display = show ? '' : 'none';
+            });
+        }
+
+        function sortTable(n) {
+            const table = document.getElementById('keyword-table');
+            let switching = true;
+            let dir = 'asc';
+            let switchcount = 0;
+
+            while (switching) {
+                switching = false;
+                const rows = table.rows;
+
+                for (let i = 1; i < rows.length - 1; i++) {
+                    let shouldSwitch = false;
+                    const x = rows[i].getElementsByTagName('td')[n];
+                    const y = rows[i + 1].getElementsByTagName('td')[n];
+
+                    let xVal = x.textContent.toLowerCase();
+                    let yVal = y.textContent.toLowerCase();
+
+                    if (n === 4) {
+                        xVal = parseFloat(rows[i].dataset.priority);
+                        yVal = parseFloat(rows[i + 1].dataset.priority);
+                    }
+
+                    if (dir === 'asc') {
+                        if (xVal > yVal) { shouldSwitch = true; break; }
+                    } else if (dir === 'desc') {
+                        if (xVal < yVal) { shouldSwitch = true; break; }
+                    }
+                }
+
+                if (shouldSwitch) {
+                    rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
+                    switching = true;
+                    switchcount++;
+                } else {
+                    if (switchcount === 0 && dir === 'asc') {
+                        dir = 'desc';
+                        switching = true;
+                    }
+                }
+            }
+        }
+
+        // D3.js Force-Directed Graph
+        const graphData = {
+            "nodes": [
+                {"id": "pillar-1", "name": "What is ServiceNow Development?", "type": "pillar", "priority": 9.2},
+                {"id": "pillar-2", "name": "ServiceNow Scripting Guide", "type": "pillar", "priority": 9.0},
+                {"id": "pillar-3", "name": "Developer Certification (CAD)", "type": "pillar", "priority": 8.8},
+                {"id": "pillar-4", "name": "GlideRecord Tutorial", "type": "pillar", "priority": 8.7},
+                {"id": "pillar-5", "name": "Flow Designer Guide", "type": "pillar", "priority": 8.6},
+                {"id": "pillar-6", "name": "REST API Integration", "type": "pillar", "priority": 8.5},
+                {"id": "cluster-1", "name": "Development for Beginners", "type": "cluster", "priority": 8.4},
+                {"id": "cluster-2", "name": "Business Rules Tutorial", "type": "cluster", "priority": 8.3},
+                {"id": "cluster-3", "name": "Client Scripts Guide", "type": "cluster", "priority": 8.2},
+                {"id": "cluster-4", "name": "Developer Salary Guide", "type": "cluster", "priority": 8.1},
+                {"id": "cluster-5", "name": "App Engine Studio", "type": "cluster", "priority": 8.0},
+                {"id": "cluster-6", "name": "ServiceNow vs Jira", "type": "cluster", "priority": 8.0},
+                {"id": "cluster-7", "name": "Script Include Tutorial", "type": "cluster", "priority": 7.9},
+                {"id": "cluster-8", "name": "Interview Questions", "type": "cluster", "priority": 7.9},
+                {"id": "cluster-9", "name": "GenAI / Now Assist", "type": "cluster", "priority": 7.8},
+                {"id": "cluster-10", "name": "Best Practices", "type": "cluster", "priority": 7.8},
+                {"id": "cluster-11", "name": "UI Builder", "type": "cluster", "priority": 7.7},
+                {"id": "cluster-12", "name": "IntegrationHub", "type": "cluster", "priority": 7.5},
+                {"id": "support-1", "name": "UI Policies", "type": "supporting", "priority": 7.4},
+                {"id": "support-2", "name": "Debugging Tools", "type": "supporting", "priority": 7.2},
+                {"id": "support-3", "name": "GlideAjax", "type": "supporting", "priority": 6.8},
+                {"id": "support-4", "name": "Update Sets", "type": "supporting", "priority": 6.7},
+                {"id": "support-5", "name": "ACLs & Security", "type": "supporting", "priority": 6.5},
+                {"id": "support-6", "name": "ATF Testing", "type": "supporting", "priority": 6.1}
+            ],
+            "links": [
+                {"source": "pillar-1", "target": "cluster-1", "value": 2},
+                {"source": "pillar-1", "target": "cluster-6", "value": 2},
+                {"source": "pillar-1", "target": "cluster-10", "value": 2},
+                {"source": "pillar-2", "target": "cluster-2", "value": 2},
+                {"source": "pillar-2", "target": "cluster-3", "value": 2},
+                {"source": "pillar-2", "target": "cluster-7", "value": 2},
+                {"source": "pillar-2", "target": "pillar-4", "value": 3},
+                {"source": "pillar-3", "target": "cluster-4", "value": 2},
+                {"source": "pillar-3", "target": "cluster-8", "value": 2},
+                {"source": "pillar-4", "target": "support-3", "value": 1},
+                {"source": "pillar-5", "target": "cluster-9", "value": 2},
+                {"source": "pillar-5", "target": "cluster-12", "value": 2},
+                {"source": "pillar-6", "target": "cluster-12", "value": 2},
+                {"source": "cluster-3", "target": "support-1", "value": 1},
+                {"source": "cluster-5", "target": "cluster-11", "value": 1},
+                {"source": "cluster-10", "target": "support-4", "value": 1},
+                {"source": "cluster-10", "target": "support-2", "value": 1},
+                {"source": "cluster-2", "target": "support-5", "value": 1},
+                {"source": "cluster-10", "target": "support-6", "value": 1},
+                {"source": "pillar-1", "target": "pillar-2", "value": 3},
+                {"source": "pillar-1", "target": "pillar-3", "value": 3},
+                {"source": "pillar-2", "target": "pillar-5", "value": 2}
+            ]
+        };
+
+        const width = document.getElementById('cluster-graph').clientWidth || 1200;
+        const height = 650;
+
+        const svg = d3.select('#cluster-graph')
+            .append('svg')
+            .attr('width', '100%')
+            .attr('height', height)
+            .attr('viewBox', [0, 0, width, height]);
+
+        const simulation = d3.forceSimulation(graphData.nodes)
+            .force('link', d3.forceLink(graphData.links).id(d => d.id).distance(130))
+            .force('charge', d3.forceManyBody().strength(-450))
+            .force('center', d3.forceCenter(width / 2, height / 2))
+            .force('collision', d3.forceCollide().radius(65));
+
+        const link = svg.append('g')
+            .selectAll('line')
+            .data(graphData.links)
+            .join('line')
+            .attr('class', 'link')
+            .attr('stroke-width', d => Math.sqrt(d.value) * 1.5);
+
+        const node = svg.append('g')
+            .selectAll('g')
+            .data(graphData.nodes)
+            .join('g')
+            .attr('class', d => 'node node-' + d.type)
+            .call(d3.drag()
+                .on('start', dragstarted)
+                .on('drag', dragged)
+                .on('end', dragended));
+
+        node.append('circle')
+            .attr('r', d => d.type === 'pillar' ? 28 : d.type === 'cluster' ? 20 : 14);
+
+        node.append('text')
+            .attr('dx', d => d.type === 'pillar' ? 32 : d.type === 'cluster' ? 24 : 18)
+            .attr('dy', 4)
+            .text(d => d.name.length > 22 ? d.name.substring(0, 22) + '...' : d.name);
+
+        const tooltip = d3.select('body').append('div')
+            .attr('class', 'tooltip')
+            .style('opacity', 0);
+
+        node.on('mouseover', function(event, d) {
+            tooltip.transition().duration(200).style('opacity', .9);
+            tooltip.html(`<strong>${d.name}</strong><br>Type: ${d.type.charAt(0).toUpperCase() + d.type.slice(1)}<br>Priority: ${d.priority}`)
+                .style('left', (event.pageX + 10) + 'px')
+                .style('top', (event.pageY - 28) + 'px');
+        })
+        .on('mouseout', function() {
+            tooltip.transition().duration(500).style('opacity', 0);
+        });
+
+        simulation.on('tick', () => {
+            link
+                .attr('x1', d => d.source.x)
+                .attr('y1', d => d.source.y)
+                .attr('x2', d => d.target.x)
+                .attr('y2', d => d.target.y);
+
+            node.attr('transform', d => `translate(${d.x},${d.y})`);
+        });
+
+        function dragstarted(event) {
+            if (!event.active) simulation.alphaTarget(0.3).restart();
+            event.subject.fx = event.subject.x;
+            event.subject.fy = event.subject.y;
+        }
+
+        function dragged(event) {
+            event.subject.fx = event.x;
+            event.subject.fy = event.y;
+        }
+
+        function dragended(event) {
+            if (!event.active) simulation.alphaTarget(0);
+            event.subject.fx = null;
+            event.subject.fy = null;
+        }
+    </script>
+</body>
+</html>
